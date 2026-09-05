@@ -46,7 +46,7 @@ jobs:
           EOF
           cp keystore.properties app/keystore.properties
 
-      - name: Auto-Inject Missing Drawables
+      - name: Auto-Inject All Missing Drawables
         run: |
           python3 - << 'EOF'
           import os
@@ -55,6 +55,11 @@ jobs:
           os.makedirs(drawable_dir, exist_ok=True)
 
           drawables = {
+              'ic_more_vert.xml': '''<vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zm0,2c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zm0,6c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z"/>
+          </vector>''',
+
               'ic_play.xml': '''<vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#FFFFFFFF" android:pathData="M8,5v14l11,-7z"/>
@@ -89,12 +94,13 @@ jobs:
           for name, content in drawables.items():
               with open(os.path.join(drawable_dir, name), 'w') as f:
                   f.write(content)
+
+          print("Successfully injected all required vector icons including ic_more_vert!")
           EOF
 
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
-      # Zero Noise Build: Warnings suppress ki gayi hain taaki clean build ho
       - name: Build Android APK
         run: |
           ./gradlew :${{ env.main_project_module }}:assembleRelease --warning-mode none
