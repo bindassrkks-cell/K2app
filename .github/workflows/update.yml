@@ -1,0 +1,1426 @@
+name: Update and Push to Repo
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  push_updates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write Missing IDs & Theme Compat
+        run: |
+          mkdir -p app/src/main/res/values
+          
+          # 1. Missing IDs (settingsFragment, downloadsFragment, pill_downloads etc.)
+          cat << 'EOF' > app/src/main/res/values/missing_ids.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <item name="settingsFragment" type="id" />
+              <item name="downloadsFragment" type="id" />
+              <item name="pill_downloads" type="id" />
+              <item name="pill_quran" type="id" />
+              <item name="pill_history" type="id" />
+              <item name="pill_input_url" type="id" />
+              <item name="quran_app" type="id" />
+              <item name="moreFragment" type="id" />
+              <item name="downloadBottomSheetDialog" type="id" />
+              <item name="downloadsAlreadyExistDialog" type="id" />
+              <item name="downloadMultipleBottomSheetDialog2" type="id" />
+              <item name="resultCardDetailsDialog" type="id" />
+          </resources>
+          EOF
+
+          # 2. Theme Compatibility (Prevents Theme.YTDLnis error)
+          cat << 'EOF' > app/src/main/res/values/theme_compat.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="Theme.YTDLnis" parent="Theme.Material3.DayNight.NoActionBar" />
+          </resources>
+          EOF
+
+      - name: Write All Vector Drawables
+        run: |
+          mkdir -p app/src/main/res/drawable
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_download.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M19,9h-4V3H9v6H5l7,7 7,-7zM5,18v2h14v-2H5z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_more_vert.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zm0,2c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zm0,6c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_quran.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M19,2L5,2c-1.1,0 -2,0.9 -2,2v16c0,1.1 0.9,2 2,2h14c1.1,0 2,-0.9 2,-2L21,4c0,-1.1 -0.9,-2 -2,-2zM19,20L5,20L5,4h7v7l2.5,-1.5L17,11L17,4h2v16z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_play.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M8,5v14l11,-7z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_pause.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M6,19h4L10,5L6,5v14zM14,5v14h4L18,5h-4z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_search.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zm-6,0C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_settings.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94 0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87c-0.12,0.21 -0.08,0.47 0.12,0.61l2.03,1.58c-0.05,0.3 -0.09,0.63 -0.09,0.94s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61l-2.01,-1.58zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6 3.6,1.62 3.6,3.6 -1.62,3.6 -3.6,3.6z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_history.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M13,3c-4.97,0 -9,4.03 -9,9H1l3.89,3.89 0.07,0.14L9,12H6c0,-3.87 3.13,-7 7,-7s7,3.13 7,7 -3.13,7 -7,7c-1.93,0 -3.68,-0.79 -4.94,-2.06l-1.42,1.42C8.27,19.99 10.51,21 13,21c4.97,0 9,-4.03 9,-9s-4.03,-9 -9,-9zm-1,5v5l4.28,2.54 0.72,-1.21 -3.5,-2.08V8H12z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_link.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M3.9,12c0,-1.71 1.39,-3.1 3.1,-3.1h4V7H7c-2.76,0 -5,2.24 -5,5s2.24,5 5,5h4v-1.9H7c-1.71,0 -3.1,-1.39 -3.1,-3.1zM8,13h8v-2H8v2zm9,-6h-4v1.9h4c1.71,0 3.1,1.39 3.1,3.1s-1.39,3.1 -3.1,3.1h-4V17h4c2.76,0 5,-2.24 5,-5s-2.24,-5 -5,-5z"/>
+          </vector>
+          EOF
+
+      - name: Write Quran & Social Feed Modules
+        run: |
+          mkdir -p app/src/main/res/layout
+          mkdir -p app/src/main/java/com/deniscerri/ytdl/ui/quran
+          mkdir -p app/src/main/java/com/deniscerri/ytdl/ui/downloads
+
+          # Layout: activity_quran.xml
+          cat << 'EOF' > app/src/main/res/layout/activity_quran.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical"
+              android:background="#0A0B0E">
+
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="60dp"
+                  android:gravity="center_vertical"
+                  android:paddingHorizontal="16dp"
+                  android:background="#16181F">
+
+                  <ImageView
+                      android:id="@+id/btn_back"
+                      android:layout_width="36dp"
+                      android:layout_height="36dp"
+                      android:src="@drawable/ic_history"
+                      app:tint="#FFFFFF"
+                      android:padding="6dp" />
+
+                  <TextView
+                      android:layout_width="0dp"
+                      android:layout_height="wrap_content"
+                      android:layout_weight="1"
+                      android:layout_marginStart="12dp"
+                      android:text="Al-Quran (القرآن الكريم)"
+                      android:textColor="#00E676"
+                      android:textSize="18sp"
+                      android:textStyle="bold" />
+              </LinearLayout>
+
+              <EditText
+                  android:id="@+id/search_surah"
+                  android:layout_width="match_parent"
+                  android:layout_height="44dp"
+                  android:layout_margin="12dp"
+                  android:background="@drawable/ic_link"
+                  android:backgroundTint="#16181F"
+                  android:paddingHorizontal="16dp"
+                  android:hint="Search Surah by name or number..."
+                  android:textColor="#FFFFFF"
+                  android:textColorHint="#757575"
+                  android:textSize="14sp" />
+
+              <ProgressBar
+                  android:id="@+id/quran_progress"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_gravity="center"
+                  android:layout_marginTop="20dp"
+                  android:visibility="gone" />
+
+              <androidx.recyclerview.widget.RecyclerView
+                  android:id="@+id/recycler_surahs"
+                  android:layout_width="match_parent"
+                  android:layout_height="0dp"
+                  android:layout_weight="1"
+                  android:padding="8dp" />
+
+              <LinearLayout
+                  android:id="@+id/audio_player_bar"
+                  android:layout_width="match_parent"
+                  android:layout_height="65dp"
+                  android:background="#16181F"
+                  android:gravity="center_vertical"
+                  android:paddingHorizontal="16dp"
+                  android:visibility="gone">
+
+                  <ImageView
+                      android:id="@+id/btn_audio_play_pause"
+                      android:layout_width="44dp"
+                      android:layout_height="44dp"
+                      android:src="@drawable/ic_pause"
+                      app:tint="#00E676"
+                      android:padding="8dp" />
+
+                  <LinearLayout
+                      android:layout_width="0dp"
+                      android:layout_height="wrap_content"
+                      android:layout_weight="1"
+                      android:layout_marginStart="12dp"
+                      android:orientation="vertical">
+
+                      <TextView
+                          android:id="@+id/audio_surah_title"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="Surah Playing"
+                          android:textColor="#FFFFFF"
+                          android:textSize="14sp"
+                          android:textStyle="bold" />
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="Reciter: Mishary Rashid Alafasy"
+                          android:textColor="#00E676"
+                          android:textSize="11sp" />
+                  </LinearLayout>
+
+                  <ImageView
+                      android:id="@+id/btn_audio_close"
+                      android:layout_width="32dp"
+                      android:layout_height="32dp"
+                      android:src="@drawable/ic_more_vert"
+                      app:tint="#A0A0A0"
+                      android:padding="6dp" />
+              </LinearLayout>
+          </LinearLayout>
+          EOF
+
+          # Layout: item_surah.xml
+          cat << 'EOF' > app/src/main/res/layout/item_surah.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <com.google.android.material.card.MaterialCardView 
+              xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:layout_marginHorizontal="6dp"
+              android:layout_marginVertical="5dp"
+              app:cardCornerRadius="14dp"
+              app:cardBackgroundColor="#16181F"
+              app:strokeColor="#262A36"
+              app:strokeWidth="1dp">
+
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:gravity="center_vertical"
+                  android:padding="12dp">
+
+                  <TextView
+                      android:id="@+id/surah_number"
+                      android:layout_width="36dp"
+                      android:layout_height="36dp"
+                      android:gravity="center"
+                      android:textColor="#00E676"
+                      android:textSize="13sp"
+                      android:textStyle="bold" />
+
+                  <LinearLayout
+                      android:layout_width="0dp"
+                      android:layout_height="wrap_content"
+                      android:layout_weight="1"
+                      android:layout_marginStart="14dp"
+                      android:orientation="vertical">
+
+                      <TextView
+                          android:id="@+id/surah_english_name"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:textColor="#FFFFFF"
+                          android:textSize="15sp"
+                          android:textStyle="bold" />
+
+                      <TextView
+                          android:id="@+id/surah_meta"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:textColor="#808080"
+                          android:textSize="12sp" />
+                  </LinearLayout>
+
+                  <TextView
+                      android:id="@+id/surah_arabic_name"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:layout_marginEnd="12dp"
+                      android:textColor="#00E676"
+                      android:textSize="18sp"
+                      android:textStyle="bold" />
+
+                  <ImageView
+                      android:id="@+id/btn_play_surah"
+                      android:layout_width="36dp"
+                      android:layout_height="36dp"
+                      android:src="@drawable/ic_play"
+                      app:tint="#00E676"
+                      android:padding="6dp" />
+              </LinearLayout>
+          </com.google.android.material.card.MaterialCardView>
+          EOF
+
+          # Layout: dialog_quran_surah.xml
+          cat << 'EOF' > app/src/main/res/layout/dialog_quran_surah.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical"
+              android:padding="16dp"
+              android:background="#16181F">
+
+              <TextView
+                  android:id="@+id/dialog_surah_title"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:gravity="center"
+                  android:textColor="#00E676"
+                  android:textSize="18sp"
+                  android:textStyle="bold" />
+
+              <ProgressBar
+                  android:id="@+id/ayah_loading"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_gravity="center"
+                  android:layout_marginTop="20dp" />
+
+              <ScrollView
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="12dp">
+                  <TextView
+                      android:id="@+id/ayah_content"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:textColor="#E0E0E0"
+                      android:textSize="15sp"
+                      android:lineSpacingMultiplier="1.3" />
+              </ScrollView>
+          </LinearLayout>
+          EOF
+
+          # Activity: QuranActivity.kt
+          cat << 'EOF' > app/src/main/java/com/deniscerri/ytdl/ui/quran/QuranActivity.kt
+          package com.deniscerri.ytdl.ui.quran
+
+          import android.media.AudioAttributes
+          import android.media.MediaPlayer
+          import android.os.Bundle
+          import android.view.LayoutInflater
+          import android.view.View
+          import android.view.ViewGroup
+          import android.widget.EditText
+          import android.widget.ImageView
+          import android.widget.LinearLayout
+          import android.widget.ProgressBar
+          import android.widget.TextView
+          import android.widget.Toast
+          import androidx.appcompat.app.AppCompatActivity
+          import androidx.core.widget.doAfterTextChanged
+          import androidx.lifecycle.lifecycleScope
+          import androidx.recyclerview.widget.LinearLayoutManager
+          import androidx.recyclerview.widget.RecyclerView
+          import com.deniscerri.ytdl.R
+          import com.google.android.material.dialog.MaterialAlertDialogBuilder
+          import kotlinx.coroutines.Dispatchers
+          import kotlinx.coroutines.launch
+          import kotlinx.coroutines.withContext
+          import org.json.JSONObject
+          import java.net.URL
+
+          data class Surah(
+              val number: Int,
+              val name: String,
+              val englishName: String,
+              val englishTranslation: String,
+              val numberOfAyahs: Int,
+              val revelationType: String
+          )
+
+          class QuranActivity : AppCompatActivity() {
+              private lateinit var recyclerSurahs: RecyclerView
+              private lateinit var quranProgress: ProgressBar
+              private lateinit var audioPlayerBar: LinearLayout
+              private lateinit var btnAudioPlayPause: ImageView
+              private lateinit var audioSurahTitle: TextView
+              private var mediaPlayer: MediaPlayer? = null
+              private val surahList = mutableListOf<Surah>()
+              private var adapter: SurahAdapter? = null
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContentView(R.layout.activity_quran)
+
+                  findViewById<View>(R.id.btn_back).setOnClickListener { finish() }
+                  recyclerSurahs = findViewById(R.id.recycler_surahs)
+                  quranProgress = findViewById(R.id.quran_progress)
+                  audioPlayerBar = findViewById(R.id.audio_player_bar)
+                  btnAudioPlayPause = findViewById(R.id.btn_audio_play_pause)
+                  audioSurahTitle = findViewById(R.id.audio_surah_title)
+
+                  recyclerSurahs.layoutManager = LinearLayoutManager(this)
+
+                  findViewById<ImageView>(R.id.btn_audio_close).setOnClickListener {
+                      stopAudio()
+                      audioPlayerBar.visibility = View.GONE
+                  }
+
+                  btnAudioPlayPause.setOnClickListener {
+                      mediaPlayer?.let { player ->
+                          if (player.isPlaying) {
+                              player.pause()
+                              btnAudioPlayPause.setImageResource(R.drawable.ic_play)
+                          } else {
+                              player.start()
+                              btnAudioPlayPause.setImageResource(R.drawable.ic_pause)
+                          }
+                      }
+                  }
+
+                  findViewById<EditText>(R.id.search_surah).doAfterTextChanged { text ->
+                      val query = text.toString().trim()
+                      val filtered = if (query.isEmpty()) surahList else surahList.filter {
+                          it.englishName.contains(query, ignoreCase = true) ||
+                          it.name.contains(query, ignoreCase = true) ||
+                          it.number.toString() == query
+                      }
+                      adapter?.updateList(filtered)
+                  }
+
+                  loadSurahList()
+              }
+
+              private fun loadSurahList() {
+                  quranProgress.visibility = View.VISIBLE
+                  lifecycleScope.launch(Dispatchers.IO) {
+                      try {
+                          val jsonUrl = "https://api.alquran.cloud/v1/surah"
+                          val text = URL(jsonUrl).readText()
+                          val json = JSONObject(text)
+                          val dataArray = json.getJSONArray("data")
+
+                          surahList.clear()
+                          for (i in 0 until dataArray.length()) {
+                              val obj = dataArray.getJSONObject(i)
+                              surahList.add(
+                                  Surah(
+                                      number = obj.getInt("number"),
+                                      name = obj.getString("name"),
+                                      englishName = obj.getString("englishName"),
+                                      englishTranslation = obj.getString("englishNameTranslation"),
+                                      numberOfAyahs = obj.getInt("numberOfAyahs"),
+                                      revelationType = obj.getString("revelationType")
+                                  )
+                              )
+                          }
+                      } catch (e: Exception) {
+                          e.printStackTrace()
+                      }
+
+                      withContext(Dispatchers.Main) {
+                          quranProgress.visibility = View.GONE
+                          adapter = SurahAdapter(
+                              surahList,
+                              onSurahClick = { surah -> viewSurahAyahs(surah) },
+                              onPlayClick = { surah -> playSurahAudio(surah) }
+                          )
+                          recyclerSurahs.adapter = adapter
+                      }
+                  }
+              }
+
+              private fun playSurahAudio(surah: Surah) {
+                  audioPlayerBar.visibility = View.VISIBLE
+                  audioSurahTitle.text = surah.number.toString() + ". " + surah.englishName + " (" + surah.name + ")"
+                  btnAudioPlayPause.setImageResource(R.drawable.ic_pause)
+
+                  stopAudio()
+                  val audioUrl = String.format("https://server8.mp3quran.net/afs/%03d.mp3", surah.number)
+                  Toast.makeText(this, "Streaming Surah " + surah.englishName + "...", Toast.LENGTH_SHORT).show()
+
+                  lifecycleScope.launch(Dispatchers.IO) {
+                      try {
+                          mediaPlayer = MediaPlayer().apply {
+                              setAudioAttributes(
+                                  AudioAttributes.Builder()
+                                      .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                      .setUsage(AudioAttributes.USAGE_MEDIA)
+                                      .build()
+                              )
+                              setDataSource(audioUrl)
+                              prepare()
+                              start()
+                          }
+                      } catch (e: Exception) {
+                          withContext(Dispatchers.Main) {
+                              Toast.makeText(this@QuranActivity, "Audio stream error", Toast.LENGTH_SHORT).show()
+                          }
+                      }
+                  }
+              }
+
+              private fun viewSurahAyahs(surah: Surah) {
+                  val dialogView = layoutInflater.inflate(R.layout.dialog_quran_surah, null)
+                  val title = dialogView.findViewById<TextView>(R.id.dialog_surah_title)
+                  val content = dialogView.findViewById<TextView>(R.id.ayah_content)
+                  val loading = dialogView.findViewById<ProgressBar>(R.id.ayah_loading)
+
+                  title.text = surah.name + " (" + surah.englishName + ") - " + surah.numberOfAyahs + " Ayahs"
+
+                  val dialog = MaterialAlertDialogBuilder(this)
+                      .setView(dialogView)
+                      .setPositiveButton("Close", null)
+                      .create()
+                  dialog.show()
+
+                  lifecycleScope.launch(Dispatchers.IO) {
+                      val sb = StringBuilder()
+                      try {
+                          val apiUrl = "https://api.alquran.cloud/v1/surah/" + surah.number + "/editions/quran-uthmani,en.sahih"
+                          val text = URL(apiUrl).readText()
+                          val json = JSONObject(text)
+                          val dataArr = json.getJSONArray("data")
+                          val arabicAyahs = dataArr.getJSONObject(0).getJSONArray("ayahs")
+                          val englishAyahs = dataArr.getJSONObject(1).getJSONArray("ayahs")
+
+                          for (i in 0 until arabicAyahs.length()) {
+                              val arText = arabicAyahs.getJSONObject(i).getString("text")
+                              val enText = englishAyahs.getJSONObject(i).getString("text")
+                              val num = i + 1
+                              sb.append("[" + num + "] " + arText + "\n" + enText + "\n\n")
+                          }
+                      } catch (e: Exception) {
+                          sb.append("Error loading Ayahs: " + e.message)
+                      }
+
+                      withContext(Dispatchers.Main) {
+                          loading.visibility = View.GONE
+                          content.text = sb.toString()
+                      }
+                  }
+              }
+
+              private fun stopAudio() {
+                  mediaPlayer?.stop()
+                  mediaPlayer?.release()
+                  mediaPlayer = null
+              }
+
+              override fun onDestroy() {
+                  super.onDestroy()
+                  stopAudio()
+              }
+          }
+
+          class SurahAdapter(
+              private var list: List<Surah>,
+              private val onSurahClick: (Surah) -> Unit,
+              private val onPlayClick: (Surah) -> Unit
+          ) : RecyclerView.Adapter<SurahAdapter.ViewHolder>() {
+
+              class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
+                  val number: TextView = v.findViewById(R.id.surah_number)
+                  val english: TextView = v.findViewById(R.id.surah_english_name)
+                  val meta: TextView = v.findViewById(R.id.surah_meta)
+                  val arabic: TextView = v.findViewById(R.id.surah_arabic_name)
+                  val btnPlay: ImageView = v.findViewById(R.id.btn_play_surah)
+              }
+
+              override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+                  val v = LayoutInflater.from(parent.context).inflate(R.layout.item_surah, parent, false)
+                  return ViewHolder(v)
+              }
+
+              override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+                  val item = list[position]
+                  holder.number.text = item.number.toString()
+                  holder.english.text = item.englishName
+                  holder.meta.text = item.englishTranslation + " • " + item.numberOfAyahs + " Ayahs • " + item.revelationType
+                  holder.arabic.text = item.name
+
+                  holder.itemView.setOnClickListener { onSurahClick(item) }
+                  holder.btnPlay.setOnClickListener { onPlayClick(item) }
+              }
+
+              override fun getItemCount() = list.size
+
+              fun updateList(newList: List<Surah>) {
+                  list = newList
+                  notifyDataSetChanged()
+              }
+          }
+          EOF
+
+          # Layout: fragment_social_feed.xml
+          cat << 'EOF' > app/src/main/res/layout/fragment_social_feed.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="#0A0B0E">
+
+              <androidx.recyclerview.widget.RecyclerView
+                  android:id="@+id/social_recycler"
+                  android:layout_width="match_parent"
+                  android:layout_height="match_parent"
+                  android:padding="12dp"
+                  android:clipToPadding="false" />
+
+              <ProgressBar
+                  android:id="@+id/social_progress"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_gravity="center"
+                  android:visibility="gone" />
+          </FrameLayout>
+          EOF
+
+          # Layout: item_social_post.xml
+          cat << 'EOF' > app/src/main/res/layout/item_social_post.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <com.google.android.material.card.MaterialCardView
+              xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              android:id="@+id/post_card"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:layout_marginBottom="12dp"
+              app:cardCornerRadius="16dp"
+              app:cardBackgroundColor="#16181F"
+              app:strokeColor="#262A36"
+              app:strokeWidth="1dp"
+              android:clickable="true"
+              android:focusable="true">
+
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="vertical">
+
+                  <ImageView
+                      android:id="@+id/post_thumb"
+                      android:layout_width="match_parent"
+                      android:layout_height="180dp"
+                      android:scaleType="centerCrop" />
+
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:padding="14dp"
+                      android:orientation="vertical">
+
+                      <TextView
+                          android:id="@+id/post_date"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:textColor="#00E676"
+                          android:textSize="11sp"
+                          android:textStyle="bold" />
+
+                      <TextView
+                          android:id="@+id/post_title"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="4dp"
+                          android:textColor="#FFFFFF"
+                          android:textSize="15sp"
+                          android:textStyle="bold" />
+
+                      <TextView
+                          android:id="@+id/post_summary"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="4dp"
+                          android:maxLines="3"
+                          android:ellipsize="end"
+                          android:textColor="#A0A0A0"
+                          android:textSize="13sp" />
+                  </LinearLayout>
+              </LinearLayout>
+          </com.google.android.material.card.MaterialCardView>
+          EOF
+
+          # Layout: dialog_social_post_detail.xml
+          cat << 'EOF' > app/src/main/res/layout/dialog_social_post_detail.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:background="#16181F">
+
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="vertical"
+                  android:padding="16dp">
+
+                  <ImageView
+                      android:id="@+id/detail_image"
+                      android:layout_width="match_parent"
+                      android:layout_height="200dp"
+                      android:scaleType="centerCrop"
+                      android:layout_marginBottom="12dp" />
+
+                  <TextView
+                      android:id="@+id/detail_title"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:textColor="#FFFFFF"
+                      android:textSize="18sp"
+                      android:textStyle="bold" />
+
+                  <TextView
+                      android:id="@+id/detail_content"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="10dp"
+                      android:textColor="#D0D0D0"
+                      android:textSize="14sp"
+                      android:lineSpacingMultiplier="1.3" />
+              </LinearLayout>
+          </ScrollView>
+          EOF
+
+          # Fragment: HistoryFragment.kt (Social Feed Implementation)
+          cat << 'EOF' > app/src/main/java/com/deniscerri/ytdl/ui/downloads/HistoryFragment.kt
+          package com.deniscerri.ytdl.ui.downloads
+
+          import android.graphics.BitmapFactory
+          import android.os.Bundle
+          import android.view.LayoutInflater
+          import android.view.View
+          import android.view.ViewGroup
+          import android.widget.ImageView
+          import android.widget.ProgressBar
+          import android.widget.TextView
+          import androidx.fragment.app.Fragment
+          import androidx.lifecycle.lifecycleScope
+          import androidx.recyclerview.widget.LinearLayoutManager
+          import androidx.recyclerview.widget.RecyclerView
+          import com.deniscerri.ytdl.R
+          import com.google.android.material.card.MaterialCardView
+          import com.google.android.material.dialog.MaterialAlertDialogBuilder
+          import kotlinx.coroutines.Dispatchers
+          import kotlinx.coroutines.launch
+          import kotlinx.coroutines.withContext
+          import org.json.JSONArray
+          import java.net.URL
+
+          data class SocialPost(
+              val title: String,
+              val date: String,
+              val thumbnail: String,
+              val content: String
+          )
+
+          class HistoryFragment : Fragment() {
+              private lateinit var recyclerView: RecyclerView
+              private lateinit var progressBar: ProgressBar
+
+              override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+                  val view = inflater.inflate(R.layout.fragment_social_feed, container, false)
+                  recyclerView = view.findViewById(R.id.social_recycler)
+                  progressBar = view.findViewById(R.id.social_progress)
+                  recyclerView.layoutManager = LinearLayoutManager(context)
+
+                  loadSocialFeed()
+                  return view
+              }
+
+              private fun loadSocialFeed() {
+                  progressBar.visibility = View.VISIBLE
+                  lifecycleScope.launch(Dispatchers.IO) {
+                      val posts = mutableListOf<SocialPost>()
+                      try {
+                          val jsonUrl = "https://raw.githubusercontent.com/Bindassrkks/K2app/main/social.json"
+                          val text = URL(jsonUrl).readText()
+                          val array = JSONArray(text)
+                          for (i in 0 until array.length()) {
+                              val obj = array.getJSONObject(i)
+                              posts.add(
+                                  SocialPost(
+                                      title = obj.optString("title", "Islamic Post"),
+                                      date = obj.optString("date", "Today"),
+                                      thumbnail = obj.optString("thumbnail", ""),
+                                      content = obj.optString("content", "")
+                                  )
+                              )
+                          }
+                      } catch (e: Exception) {
+                          e.printStackTrace()
+                      }
+
+                      withContext(Dispatchers.Main) {
+                          progressBar.visibility = View.GONE
+                          recyclerView.adapter = SocialFeedAdapter(posts) { post ->
+                              showPostDetailsDialog(post)
+                          }
+                      }
+                  }
+              }
+
+              private fun showPostDetailsDialog(post: SocialPost) {
+                  val dialogView = layoutInflater.inflate(R.layout.dialog_social_post_detail, null)
+                  val img = dialogView.findViewById<ImageView>(R.id.detail_image)
+                  val title = dialogView.findViewById<TextView>(R.id.detail_title)
+                  val content = dialogView.findViewById<TextView>(R.id.detail_content)
+
+                  title.text = post.title
+                  content.text = post.content
+                  if (post.thumbnail.isNotEmpty()) {
+                      lifecycleScope.launch(Dispatchers.IO) {
+                          try {
+                              val bmp = BitmapFactory.decodeStream(URL(post.thumbnail).openStream())
+                              withContext(Dispatchers.Main) {
+                                  img.setImageBitmap(bmp)
+                                  img.visibility = View.VISIBLE
+                              }
+                          } catch (err: Exception) {
+                              withContext(Dispatchers.Main) { img.visibility = View.GONE }
+                          }
+                      }
+                  } else {
+                      img.visibility = View.GONE
+                  }
+
+                  MaterialAlertDialogBuilder(requireContext())
+                      .setView(dialogView)
+                      .setPositiveButton("Close", null)
+                      .show()
+              }
+
+              fun openSearchView() {}
+          }
+
+          class SocialFeedAdapter(
+              private val list: List<SocialPost>,
+              private val onClick: (SocialPost) -> Unit
+          ) : RecyclerView.Adapter<SocialFeedAdapter.ViewHolder>() {
+
+              class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
+                  val card: MaterialCardView = v.findViewById(R.id.post_card)
+                  val thumb: ImageView = v.findViewById(R.id.post_thumb)
+                  val title: TextView = v.findViewById(R.id.post_title)
+                  val date: TextView = v.findViewById(R.id.post_date)
+                  val summary: TextView = v.findViewById(R.id.post_summary)
+              }
+
+              override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+                  val v = LayoutInflater.from(parent.context).inflate(R.layout.item_social_post, parent, false)
+                  return ViewHolder(v)
+              }
+
+              override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+                  val item = list[position]
+                  holder.title.text = item.title
+                  holder.date.text = item.date
+                  holder.summary.text = item.content
+                  if (item.thumbnail.isNotEmpty()) {
+                      (holder.itemView.context as? androidx.lifecycle.LifecycleOwner)?.lifecycleScope?.launch(Dispatchers.IO) {
+                          try {
+                              val bmp = BitmapFactory.decodeStream(URL(item.thumbnail).openStream())
+                              withContext(Dispatchers.Main) {
+                                  holder.thumb.setImageBitmap(bmp)
+                                  holder.thumb.visibility = View.VISIBLE
+                              }
+                          } catch (err: Exception) {
+                              withContext(Dispatchers.Main) { holder.thumb.visibility = View.GONE }
+                          }
+                      }
+                  } else {
+                      holder.thumb.visibility = View.GONE
+                  }
+                  holder.card.setOnClickListener { onClick(item) }
+              }
+
+              override fun getItemCount() = list.size
+          }
+          EOF
+
+      - name: Write AMOLED Home Screen Layout
+        run: |
+          cat << 'EOF' > app/src/main/res/layout/fragment_home.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <androidx.coordinatorlayout.widget.CoordinatorLayout 
+              xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="#0A0B0E">
+
+              <com.google.android.material.appbar.AppBarLayout
+                  android:id="@+id/home_appbarlayout"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:background="#0A0B0E"
+                  app:elevation="0dp">
+
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="60dp"
+                      android:orientation="horizontal"
+                      android:gravity="center_vertical"
+                      android:paddingHorizontal="16dp">
+
+                      <LinearLayout
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:gravity="center_vertical"
+                          android:orientation="horizontal">
+
+                          <com.google.android.material.card.MaterialCardView
+                              android:layout_width="38dp"
+                              android:layout_height="38dp"
+                              app:cardCornerRadius="19dp"
+                              app:cardBackgroundColor="#16181F"
+                              app:cardElevation="0dp"
+                              app:strokeWidth="1dp"
+                              app:strokeColor="#262A36">
+                              <ImageView
+                                  android:id="@+id/header_app_logo"
+                                  android:layout_width="match_parent"
+                                  android:layout_height="match_parent"
+                                  android:padding="8dp"
+                                  android:src="@drawable/ic_play"
+                                  app:tint="#00E676" />
+                          </com.google.android.material.card.MaterialCardView>
+
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:layout_marginStart="10dp"
+                              android:text="Al-SHOW  BÉTÆ"
+                              android:textColor="#FFFFFF"
+                              android:textSize="20sp"
+                              android:textStyle="bold" />
+                      </LinearLayout>
+
+                      <ImageView
+                          android:id="@+id/btn_quick_search"
+                          android:layout_width="42dp"
+                          android:layout_height="42dp"
+                          android:background="?attr/selectableItemBackgroundBorderless"
+                          android:clickable="true"
+                          android:focusable="true"
+                          android:padding="9dp"
+                          android:src="@drawable/ic_search"
+                          app:tint="#E0E0E0" />
+
+                      <ImageView
+                          android:id="@+id/btn_settings"
+                          android:layout_width="42dp"
+                          android:layout_height="42dp"
+                          android:layout_marginStart="4dp"
+                          android:background="?attr/selectableItemBackgroundBorderless"
+                          android:clickable="true"
+                          android:focusable="true"
+                          android:padding="8dp"
+                          android:src="@drawable/ic_settings"
+                          app:tint="#E0E0E0" />
+                  </LinearLayout>
+
+                  <HorizontalScrollView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:scrollbars="none"
+                      android:paddingStart="14dp"
+                      android:paddingEnd="14dp"
+                      android:paddingBottom="10dp"
+                      android:clipToPadding="false">
+
+                      <LinearLayout
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:orientation="horizontal"
+                          android:gravity="center_vertical">
+
+                          <com.google.android.material.card.MaterialCardView
+                              android:id="@+id/pill_history"
+                              android:layout_width="wrap_content"
+                              android:layout_height="36dp"
+                              android:layout_marginEnd="8dp"
+                              app:cardCornerRadius="18dp"
+                              app:cardBackgroundColor="#1B2B23"
+                              app:strokeColor="#00E676"
+                              app:strokeWidth="1dp"
+                              android:clickable="true"
+                              android:focusable="true">
+                              <LinearLayout
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="match_parent"
+                                  android:gravity="center"
+                                  android:paddingHorizontal="14dp">
+                                  <ImageView
+                                      android:layout_width="16dp"
+                                      android:layout_height="16dp"
+                                      android:src="@drawable/ic_history"
+                                      app:tint="#00E676" />
+                                  <TextView
+                                      android:layout_width="wrap_content"
+                                      android:layout_height="wrap_content"
+                                      android:layout_marginStart="6dp"
+                                      android:text="Islamic Stream"
+                                      android:textColor="#00E676"
+                                      android:textStyle="bold"
+                                      android:textSize="12sp" />
+                              </LinearLayout>
+                          </com.google.android.material.card.MaterialCardView>
+
+                          <com.google.android.material.card.MaterialCardView
+                              android:id="@+id/pill_quran"
+                              android:layout_width="wrap_content"
+                              android:layout_height="36dp"
+                              android:layout_marginEnd="8dp"
+                              app:cardCornerRadius="18dp"
+                              app:cardBackgroundColor="#16181F"
+                              app:strokeColor="#00E676"
+                              app:strokeWidth="1dp"
+                              android:clickable="true"
+                              android:focusable="true">
+                              <LinearLayout
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="match_parent"
+                                  android:gravity="center"
+                                  android:paddingHorizontal="14dp">
+                                  <ImageView
+                                      android:layout_width="16dp"
+                                      android:layout_height="16dp"
+                                      android:src="@drawable/ic_quran"
+                                      app:tint="#00E676" />
+                                  <TextView
+                                      android:layout_width="wrap_content"
+                                      android:layout_height="wrap_content"
+                                      android:layout_marginStart="6dp"
+                                      android:text="Al-Quran"
+                                      android:textColor="#FFFFFF"
+                                      android:textStyle="bold"
+                                      android:textSize="12sp" />
+                              </LinearLayout>
+                          </com.google.android.material.card.MaterialCardView>
+
+                          <com.google.android.material.card.MaterialCardView
+                              android:id="@+id/pill_input_url"
+                              android:layout_width="wrap_content"
+                              android:layout_height="36dp"
+                              android:layout_marginEnd="8dp"
+                              app:cardCornerRadius="18dp"
+                              app:cardBackgroundColor="#16181F"
+                              app:strokeColor="#262A36"
+                              app:strokeWidth="1dp"
+                              android:clickable="true"
+                              android:focusable="true">
+                              <LinearLayout
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="match_parent"
+                                  android:gravity="center"
+                                  android:paddingHorizontal="14dp">
+                                  <ImageView
+                                      android:layout_width="16dp"
+                                      android:layout_height="16dp"
+                                      android:src="@drawable/ic_search"
+                                      app:tint="#A0A0A0" />
+                                  <TextView
+                                      android:layout_width="wrap_content"
+                                      android:layout_height="wrap_content"
+                                      android:layout_marginStart="6dp"
+                                      android:text="Paste URL"
+                                      android:textColor="#E0E0E0"
+                                      android:textStyle="bold"
+                                      android:textSize="12sp" />
+                              </LinearLayout>
+                          </com.google.android.material.card.MaterialCardView>
+
+                          <HorizontalScrollView
+                              android:id="@+id/playlist_selection_chips_scrollview"
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:visibility="gone">
+                              <com.google.android.material.chip.ChipGroup
+                                  android:id="@+id/playlist_selection_chips"
+                                  android:layout_width="wrap_content"
+                                  android:layout_height="wrap_content"
+                                  app:singleSelection="true" />
+                          </HorizontalScrollView>
+                      </LinearLayout>
+                  </HorizontalScrollView>
+
+                  <com.google.android.material.appbar.MaterialToolbar
+                      android:id="@+id/home_toolbar"
+                      android:layout_width="match_parent"
+                      android:layout_height="0dp"
+                      android:visibility="gone" />
+
+                  <com.google.android.material.search.SearchBar
+                      android:id="@+id/search_bar"
+                      android:layout_width="match_parent"
+                      android:layout_height="46dp"
+                      android:layout_marginHorizontal="14dp"
+                      android:layout_marginBottom="10dp"
+                      android:hint="Search Quran recitations or paste link..."
+                      app:backgroundTint="#16181F"
+                      android:elevation="1dp" />
+
+              </com.google.android.material.appbar.AppBarLayout>
+
+              <androidx.constraintlayout.widget.ConstraintLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="match_parent"
+                  app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+                  <com.facebook.shimmer.ShimmerFrameLayout
+                      android:id="@+id/shimmer_results_framelayout"
+                      android:layout_width="match_parent"
+                      android:layout_height="match_parent"
+                      android:visibility="gone">
+                      <LinearLayout
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:orientation="vertical"
+                          android:padding="12dp">
+                          <View
+                              android:layout_width="match_parent"
+                              android:layout_height="220dp"
+                              android:background="#16181F"
+                              android:layout_marginBottom="14dp" />
+                      </LinearLayout>
+                  </com.facebook.shimmer.ShimmerFrameLayout>
+
+                  <androidx.recyclerview.widget.RecyclerView
+                      android:id="@+id/recyclerViewHome"
+                      android:layout_width="match_parent"
+                      android:layout_height="match_parent"
+                      android:paddingHorizontal="10dp"
+                      android:paddingTop="4dp"
+                      android:paddingBottom="90dp"
+                      android:clipToPadding="false" />
+
+                  <androidx.constraintlayout.widget.ConstraintLayout
+                      android:id="@+id/queries_constraint"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:visibility="gone"
+                      android:background="#16181F"
+                      android:padding="8dp"
+                      app:layout_constraintTop_toTopOf="parent">
+
+                      <com.google.android.material.chip.ChipGroup
+                          android:id="@+id/queries"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          app:layout_constraintStart_toStartOf="parent"
+                          app:layout_constraintEnd_toStartOf="@+id/init_search_query"
+                          app:layout_constraintTop_toTopOf="parent" />
+
+                      <com.google.android.material.button.MaterialButton
+                          android:id="@+id/init_search_query"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="Start"
+                          app:layout_constraintEnd_toEndOf="parent"
+                          app:layout_constraintTop_toTopOf="parent" />
+                  </androidx.constraintlayout.widget.ConstraintLayout>
+
+                  <ProgressBar
+                      android:id="@+id/progress"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:visibility="gone"
+                      app:layout_constraintBottom_toBottomOf="parent"
+                      app:layout_constraintEnd_toEndOf="parent"
+                      app:layout_constraintStart_toStartOf="parent"
+                      app:layout_constraintTop_toTopOf="parent" />
+
+              </androidx.constraintlayout.widget.ConstraintLayout>
+
+              <LinearLayout
+                  android:id="@+id/home_fabs"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:orientation="vertical"
+                  android:layout_gravity="bottom|end"
+                  android:layout_margin="16dp">
+
+                  <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+                      android:id="@+id/copied_url_fab"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Paste &amp; Play"
+                      android:visibility="gone"
+                      android:layout_marginBottom="8dp"
+                      app:icon="@drawable/ic_link"
+                      android:backgroundTint="#00E676"
+                      android:textColor="#000000"
+                      app:iconTint="#000000" />
+
+                  <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+                      android:id="@+id/download_selected_fab"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Download Selected"
+                      android:visibility="gone"
+                      android:layout_marginBottom="8dp"
+                      app:icon="@drawable/ic_download"
+                      android:backgroundTint="#262A36"
+                      android:textColor="#FFFFFF" />
+
+                  <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+                      android:id="@+id/download_all_fab"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Download Playlist"
+                      android:visibility="gone"
+                      app:icon="@drawable/ic_download"
+                      android:backgroundTint="#00E676"
+                      android:textColor="#000000"
+                      app:iconTint="#000000" />
+              </LinearLayout>
+
+              <com.google.android.material.search.SearchView
+                  android:id="@+id/search_view"
+                  android:layout_width="match_parent"
+                  android:layout_height="match_parent"
+                  android:hint="Search Quran recitations..."
+                  app:layout_anchor="@id/search_bar">
+
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="match_parent"
+                      android:orientation="vertical"
+                      android:background="#0A0B0E">
+
+                      <HorizontalScrollView
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:padding="8dp">
+                          <com.google.android.material.chip.ChipGroup
+                              android:id="@+id/providers"
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              app:singleSelection="true" />
+                      </HorizontalScrollView>
+
+                      <View
+                          android:id="@+id/chipGroupDivider"
+                          android:layout_width="match_parent"
+                          android:layout_height="1dp"
+                          android:background="#1E2029" />
+
+                      <androidx.recyclerview.widget.RecyclerView
+                          android:id="@+id/search_suggestions_recycler"
+                          android:layout_width="match_parent"
+                          android:layout_height="match_parent" />
+                  </LinearLayout>
+              </com.google.android.material.search.SearchView>
+
+          </androidx.coordinatorlayout.widget.CoordinatorLayout>
+          EOF
+
+      - name: Patch Manifest, Navigation & MoreFragment
+        run: |
+          python3 - << 'PYEOF'
+          import os
+          import re
+
+          # 1. AndroidManifest: register QuranActivity
+          manifest_path = 'app/src/main/AndroidManifest.xml'
+          if os.path.exists(manifest_path):
+              with open(manifest_path, 'r', encoding='utf-8') as f:
+                  m = f.read()
+              if 'com.deniscerri.ytdl.ui.quran.QuranActivity' not in m:
+                  m = m.replace('</application>', '    <activity android:name="com.deniscerri.ytdl.ui.quran.QuranActivity" android:exported="false" />\n    </application>')
+                  with open(manifest_path, 'w', encoding='utf-8') as f:
+                      f.write(m)
+
+          # 2. MoreFragment layout: add Quran button
+          more_xml_path = 'app/src/main/res/layout/fragment_more.xml'
+          if os.path.exists(more_xml_path):
+              with open(more_xml_path, 'r', encoding='utf-8') as f:
+                  mxml = f.read()
+              if 'id="@+id/quran_app"' not in mxml:
+                  q_btn = '''            <TextView
+                      android:id="@+id/quran_app"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:drawablePadding="35dp"
+                      android:textSize="16sp"
+                      android:paddingVertical="15dp"
+                      android:text="Al-Quran (القرآن الكريم)"
+                      android:textColor="#00E676"
+                      android:textStyle="bold"
+                      android:clickable="true"
+                      android:focusable="true"
+                      android:background="?android:attr/selectableItemBackground"
+                      android:paddingHorizontal="15dp"
+                      app:drawableStartCompat="@drawable/ic_quran" />
+          '''
+                  mxml = re.sub(r'(<TextView\s+android:id="@+id/settings"[^>]*>)', q_btn + r'\1', mxml)
+                  with open(more_xml_path, 'w', encoding='utf-8') as f:
+                      f.write(mxml)
+
+          # 3. MoreFragment.kt: bind Quran button
+          more_kt = 'app/src/main/java/com/deniscerri/ytdl/ui/more/MoreFragment.kt'
+          if os.path.exists(more_kt):
+              with open(more_kt, 'r', encoding='utf-8') as f:
+                  mkt = f.read()
+              if 'QuranActivity' not in mkt:
+                  mkt = re.sub(r'(package [^\n]+)', r'\1\nimport com.deniscerri.ytdl.ui.quran.QuranActivity\nimport android.widget.TextView', mkt, count=1)
+                  hook = '''
+                  view.findViewById<android.widget.TextView>(R.id.quran_app)?.setOnClickListener {
+                      startActivity(android.content.Intent(requireContext(), QuranActivity::class.java))
+                  }
+                  '''
+                  if 'settings =' in mkt:
+                      mkt = mkt.replace('settings =', hook + '\n        settings =')
+                  with open(more_kt, 'w', encoding='utf-8') as f:
+                      f.write(mkt)
+
+          # 4. Nav Menu: change label to Social Feed
+          menu_path = 'app/src/main/res/menu/main_nav_menu.xml'
+          if os.path.exists(menu_path):
+              with open(menu_path, 'r', encoding='utf-8') as f:
+                  nav = f.read()
+              nav = re.sub(r'(<item\s+android:id="@+id/historyFragment".*?android:title=)"[^"]*"', r'\1"Social Feed"', nav)
+              with open(menu_path, 'w', encoding='utf-8') as f:
+                  f.write(nav)
+
+          print("Manifest and MoreFragment patched successfully!")
+          PYEOF
+
+      - name: Hook Islamic & Quran Actions into HomeFragment.kt
+        run: |
+          python3 - << 'PYEOF'
+          import os
+          import re
+
+          home_kt = 'app/src/main/java/com/deniscerri/ytdl/ui/HomeFragment.kt'
+          if os.path.exists(home_kt):
+              with open(home_kt, 'r', encoding='utf-8') as f:
+                  code = f.read()
+
+              # Clean up any bad syntax if previously injected
+              lines = code.splitlines()
+              clean_lines = [l for l in lines if not l.strip().startswith('import com.deniscerri.ytdl.ui.quran.QuranActivity') and not l.strip().startswith('import org.json.JSONArray')]
+              code = '\n'.join(clean_lines)
+
+              # Add imports cleanly right below package line
+              code = re.sub(
+                  r'(package [^\n]+)',
+                  r'\1\nimport com.deniscerri.ytdl.ui.quran.QuranActivity\nimport org.json.JSONArray\nimport java.net.URL',
+                  code,
+                  count=1
+              )
+
+              # Hook clicks inside onViewCreated
+              if 'pill_quran' not in code:
+                  hook = '''
+                  view.findViewById<android.view.View>(R.id.pill_quran)?.setOnClickListener {
+                      startActivity(android.content.Intent(requireContext(), QuranActivity::class.java))
+                  }
+                  view.findViewById<android.view.View>(R.id.pill_history)?.setOnClickListener {
+                      loadIslamicHomeContent()
+                  }
+                  '''
+                  code = code.replace(
+                      'super.onViewCreated(view, savedInstanceState)',
+                      'super.onViewCreated(view, savedInstanceState)\n' + hook
+                  )
+
+              # Add loadIslamicHomeContent function if not present
+              if 'loadIslamicHomeContent' not in code:
+                  helper = '''
+              private fun loadIslamicHomeContent() {
+                  lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                      try {
+                          val text = URL("https://raw.githubusercontent.com/Bindassrkks/K2app/main/data.json").readText()
+                          val jsonArray = JSONArray(text)
+                          val urls = mutableListOf<String>()
+                          for (i in 0 until jsonArray.length()) {
+                              val u = jsonArray.getJSONObject(i).optString("url")
+                              if (u.isNotEmpty()) urls.add(u)
+                          }
+                          if (urls.isNotEmpty()) {
+                              kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                  resultViewModel.deleteAll()
+                                  resultViewModel.parseQueries(urls) {}
+                              }
+                          }
+                      } catch (e: Exception) {
+                          e.printStackTrace()
+                      }
+                  }
+              }
+              '''
+                  last_idx = code.rfind('}')
+                  if last_idx != -1:
+                      code = code[:last_idx] + helper + '\n}'
+
+              with open(home_kt, 'w', encoding='utf-8') as f:
+                  f.write(code)
+
+          print("HomeFragment.kt hooked successfully!")
+          PYEOF
+
+      - name: Commit & Push Changes to Repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/
+          if ! git diff --staged --quiet; then
+            git commit -m "Update: AMOLED UI, Quran feature, Social Feed & Missing Resources [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+            echo "SUCCESS: Code pushed to repository successfully!"
+          else
+            echo "No changes to commit. Everything is already up-to-date."
+          fi
