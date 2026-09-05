@@ -28,30 +28,25 @@ jobs:
           distribution: 'corretto'
           cache: 'gradle'
 
-      - name: Auto-Resolve Keystores & Properties
-        shell: bash
+      - name: Setup Keystores & Properties
         run: |
-          mkdir -p ~/.android
+          mkdir -p ~/.android app
           keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           cp debug.keystore ~/.android/debug.keystore
-          mkdir -p app
           cp debug.keystore app/debug.keystore
           cp debug.keystore app/release_keystore.jks
           cp debug.keystore release_keystore.jks
           touch local.properties
-          echo "storeFile=release_keystore.jks" > keystore.properties
-          echo "storePassword=android" >> keystore.properties
-          echo "keyAlias=androiddebugkey" >> keystore.properties
-          echo "keyPassword=android" >> keystore.properties
+          printf "storeFile=release_keystore.jks\nstorePassword=android\nkeyAlias=androiddebugkey\nkeyPassword=android\n" > keystore.properties
           cp keystore.properties app/keystore.properties
 
-      - name: Inject Quran Feature, AMOLED Dark UI & All Fixes
-        shell: python
+      - name: Apply AMOLED UI, Quran Feature & Islamic Feed
         run: |
+          python3 - << 'EOF'
           import os
           import re
 
-          # 1. GENERATE ALL VECTOR DRAWABLES
+          # 1. VECTOR DRAWABLES
           drawable_dir = 'app/src/main/res/drawable'
           os.makedirs(drawable_dir, exist_ok=True)
 
@@ -106,7 +101,7 @@ jobs:
               with open(os.path.join(drawable_dir, name), 'w', encoding='utf-8') as f:
                   f.write(content)
 
-          # 2. QURAN MODULE (ACTIVITY, ADAPTER, AUDIO STREAMING, READER)
+          # 2. QURAN MODULE SETUP
           quran_dir = 'app/src/main/java/com/deniscerri/ytdl/ui/quran'
           os.makedirs(quran_dir, exist_ok=True)
           layout_dir = 'app/src/main/res/layout'
@@ -528,7 +523,7 @@ jobs:
                               val arText = arabicAyahs.getJSONObject(i).getString("text")
                               val enText = englishAyahs.getJSONObject(i).getString("text")
                               val num = i + 1
-                              sb.append("[" + num + "] " + arText + "\\n" + enText + "\\n\\n")
+                              sb.append("[" + num + "] " + arText + "\n" + enText + "\n\n")
                           }
                       } catch (e: Exception) {
                           sb.append("Error loading Ayahs: " + e.message)
@@ -591,7 +586,7 @@ jobs:
               }
           }''')
 
-          # 3. REGISTER QURAN IN MANIFEST & MORE SCREEN
+          # 3. REGISTER QURANACTIVITY IN ANDROIDMANIFEST.XML
           manifest_path = 'app/src/main/AndroidManifest.xml'
           if os.path.exists(manifest_path):
               with open(manifest_path, 'r', encoding='utf-8') as f:
@@ -607,6 +602,7 @@ jobs:
                   with open(manifest_path, 'w', encoding='utf-8') as f:
                       f.write(m_content)
 
+          # 4. ADD QURAN BUTTON TO MORE SCREEN
           more_xml_path = 'app/src/main/res/layout/fragment_more.xml'
           if os.path.exists(more_xml_path):
               with open(more_xml_path, 'r', encoding='utf-8') as f:
@@ -648,7 +644,7 @@ jobs:
                   with open(more_kt_path, 'w', encoding='utf-8') as f:
                       f.write(mkt)
 
-          # 4. SOCIAL FEED (REPLACING HISTORY)
+          # 5. SOCIAL FEED MODULE (REPLACING HISTORY)
           with open(os.path.join(layout_dir, 'fragment_social_feed.xml'), 'w', encoding='utf-8') as f:
               f.write('''<?xml version="1.0" encoding="utf-8"?>
           <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -777,6 +773,7 @@ jobs:
           with open(history_kt_path, 'w', encoding='utf-8') as f:
               f.write('''package com.deniscerri.ytdl.ui.downloads
 
+          import android.graphics.BitmapFactory
           import android.os.Bundle
           import android.view.LayoutInflater
           import android.view.View
@@ -788,7 +785,6 @@ jobs:
           import androidx.lifecycle.lifecycleScope
           import androidx.recyclerview.widget.LinearLayoutManager
           import androidx.recyclerview.widget.RecyclerView
-          import coil.load
           import com.deniscerri.ytdl.R
           import com.google.android.material.card.MaterialCardView
           import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -861,8 +857,17 @@ jobs:
                   title.text = post.title
                   content.text = post.content
                   if (post.thumbnail.isNotEmpty()) {
-                      img.load(post.thumbnail)
-                      img.visibility = View.VISIBLE
+                      lifecycleScope.launch(Dispatchers.IO) {
+                          try {
+                              val bmp = BitmapFactory.decodeStream(URL(post.thumbnail).openStream())
+                              withContext(Dispatchers.Main) {
+                                  img.setImageBitmap(bmp)
+                                  img.visibility = View.VISIBLE
+                              }
+                          } catch (err: Exception) {
+                              withContext(Dispatchers.Main) { img.visibility = View.GONE }
+                          }
+                      }
                   } else {
                       img.visibility = View.GONE
                   }
@@ -900,8 +905,17 @@ jobs:
                   holder.date.text = item.date
                   holder.summary.text = item.content
                   if (item.thumbnail.isNotEmpty()) {
-                      holder.thumb.load(item.thumbnail)
-                      holder.thumb.visibility = View.VISIBLE
+                      (holder.itemView.context as? androidx.lifecycle.LifecycleOwner)?.lifecycleScope?.launch(Dispatchers.IO) {
+                          try {
+                              val bmp = BitmapFactory.decodeStream(URL(item.thumbnail).openStream())
+                              withContext(Dispatchers.Main) {
+                                  holder.thumb.setImageBitmap(bmp)
+                                  holder.thumb.visibility = View.VISIBLE
+                              }
+                          } catch (err: Exception) {
+                              withContext(Dispatchers.Main) { holder.thumb.visibility = View.GONE }
+                          }
+                      }
                   } else {
                       holder.thumb.visibility = View.GONE
                   }
@@ -911,7 +925,7 @@ jobs:
               override fun getItemCount() = list.size
           }''')
 
-          # 5. UPDATE BOTTOM NAV LABEL TO "SOCIAL FEED"
+          # 6. UPDATE BOTTOM NAV LABEL TO "SOCIAL FEED"
           menu_path = 'app/src/main/res/menu/main_nav_menu.xml'
           if os.path.exists(menu_path):
               with open(menu_path, 'r', encoding='utf-8') as f:
@@ -920,7 +934,7 @@ jobs:
               with open(menu_path, 'w', encoding='utf-8') as f:
                   f.write(mcontent)
 
-          # 6. AMOLED DARK HOME XML (Al-SHOW  BÉTÆ)
+          # 7. AMOLED DARK HOME XML (Al-SHOW  BÉTÆ)
           home_xml_path = 'app/src/main/res/layout/fragment_home.xml'
           with open(home_xml_path, 'w', encoding='utf-8') as f:
               f.write('''<?xml version="1.0" encoding="utf-8"?>
@@ -1298,7 +1312,7 @@ jobs:
 
           </androidx.coordinatorlayout.widget.CoordinatorLayout>''')
 
-          # 7. CLEAN SYNTAX HOMEFRAGMENT.KT (USES .lines() TO AVOID ESCAPE ISSUES)
+          # 8. ERROR-FREE HOMEFRAGMENT.KT
           home_kt_path = 'app/src/main/java/com/deniscerri/ytdl/ui/HomeFragment.kt'
           with open(home_kt_path, 'w', encoding='utf-8') as f:
               f.write('''package com.deniscerri.ytdl.ui
@@ -1920,7 +1934,7 @@ jobs:
                   url?.apply {
                       val alreadyHasThem = this.all { queriesChipGroup?.children?.any { c -> (c as Chip).text.contains(it) } == true }
                       if (this.isNotEmpty() && !alreadyHasThem) {
-                          combinedList.add(0, SearchSuggestionItem(this.joinToString("\\n"), SearchSuggestionType.CLIPBOARD))
+                          combinedList.add(0, SearchSuggestionItem(this.joinToString("\n"), SearchSuggestionType.CLIPBOARD))
                       }
                   }
 
@@ -2151,15 +2165,15 @@ jobs:
                   }
 
                   override fun onDestroyActionMode(mode: ActionMode?) {
-                      actionMode = null
-                      (activity as MainActivity).enableBottomNavigation()
-                      homeAdapter.clearCheckedItems()
-                      searchBar!!.isEnabled = true
-                      playlistNameFilterChipGroup.children.forEach { it.isEnabled = true }
-                      searchBar!!.menu.forEach { it.isEnabled = true }
-                      searchBar?.expand(appBarLayout!!)
-                      downloadAllFab!!.isVisible = showDownloadAllFab
-                      clipboardFab!!.isVisible = showClipboardFab
+                  actionMode = null
+                  (activity as MainActivity).enableBottomNavigation()
+                  homeAdapter.clearCheckedItems()
+                  searchBar!!.isEnabled = true
+                  playlistNameFilterChipGroup.children.forEach { it.isEnabled = true }
+                  searchBar!!.menu.forEach { it.isEnabled = true }
+                  searchBar?.expand(appBarLayout!)
+                  downloadAllFab!!.isVisible = showDownloadAllFab
+                  clipboardFab!!.isVisible = showClipboardFab
                   }
 
                   suspend fun getSelectedIDs(): List<Long> {
@@ -2208,7 +2222,7 @@ jobs:
                   }
 
                   searchView!!.editText.setText("")
-                  queriesConstraint?.isVisible = queriesChipGroup?.childCount!! > 0
+                  queriesConstraint?.isVisible = queriesChipGroup?.childCount! > 0
 
                   searchSuggestionsAdapter?.getList()?.apply {
                       if (this.isNotEmpty() && this.first().type == SearchSuggestionType.CLIPBOARD) {
@@ -2264,19 +2278,15 @@ jobs:
               }
           }''')
 
-          print("SUCCESS: Injected Quran, Social Feed, AMOLED Theme and clean HomeFragment!")
-
-      - name: Grant Execute Permission for Gradlew
-        shell: bash
-        run: chmod +x gradlew
+          print("SUCCESS: Patcher executed completely!")
+          EOF
 
       - name: Build Android APK
-        shell: bash
         run: |
+          chmod +x gradlew
           ./gradlew :${{ env.main_project_module }}:assembleRelease --warning-mode none
 
       - name: Collect Output APKs
-        shell: bash
         run: |
           mkdir -p build_output_apks
           find . -type f -name "*.apk" -not -path "*/intermediates/*" -exec cp {} build_output_apks/ \;
