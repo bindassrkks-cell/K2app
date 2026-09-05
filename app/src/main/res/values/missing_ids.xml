@@ -7,9 +7,4 @@
     <item name="pill_history" type="id" />
     <item name="pill_input_url" type="id" />
     <item name="quran_app" type="id" />
-    <item name="moreFragment" type="id" />
-    <item name="downloadBottomSheetDialog" type="id" />
-    <item name="downloadsAlreadyExistDialog" type="id" />
-    <item name="downloadMultipleBottomSheetDialog2" type="id" />
-    <item name="resultCardDetailsDialog" type="id" />
 </resources>
