@@ -1,5 +1,27 @@
+import os
 import re
 
+# 1. Ensure dialog_about_app.xml exists (prevents runtime crash)
+os.makedirs('app/src/main/res/layout', exist_ok=True)
+dialog_layout_path = 'app/src/main/res/layout/dialog_about_app.xml'
+if not os.path.exists(dialog_layout_path):
+    with open(dialog_layout_path, 'w') as f:
+        f.write('''<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:id="@+id/text_about"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="14sp"
+        android:textColor="?android:attr/textColorPrimary" />
+</LinearLayout>''')
+
+# 2. Add 'About App' button to fragment_more.xml
 with open('app/src/main/res/layout/fragment_more.xml', 'r') as f:
     xml = f.read()
 
@@ -20,11 +42,12 @@ about_xml = """
                 app:drawableStartCompat="@drawable/ic_info" />
 """
 
-xml = re.sub(r'(<TextView\s+android:id="@+id/settings".*?/>)', r'\1' + about_xml, xml, flags=re.DOTALL)
+if 'android:id="@+id/about_app"' not in xml:
+    xml = re.sub(r'(<TextView\s+android:id="@+id/settings".*?/>)', r'\1' + about_xml, xml, flags=re.DOTALL)
+    with open('app/src/main/res/layout/fragment_more.xml', 'w') as f:
+        f.write(xml)
 
-with open('app/src/main/res/layout/fragment_more.xml', 'w') as f:
-    f.write(xml)
-
+# 3. Inject Kotlin logic in MoreFragment.kt
 with open('app/src/main/java/com/deniscerri/ytdl/ui/more/MoreFragment.kt', 'r') as f:
     kt = f.read()
 
@@ -32,18 +55,29 @@ kt_imports = """
 import android.text.method.LinkMovementMethod
 import android.text.Html
 """
-kt = re.sub(r'import android.os.Bundle', kt_imports + '\nimport android.os.Bundle', kt)
+if 'import android.text.Html' not in kt:
+    kt = re.sub(r'import android.os.Bundle', kt_imports + '\nimport android.os.Bundle', kt)
 
 # Add aboutApp variable
-kt = re.sub(r'private lateinit var settings: TextView', r'private lateinit var settings: TextView\n    private lateinit var aboutApp: TextView', kt)
-kt = re.sub(r'settings = view.findViewById\(R\.id\.settings\)', r'settings = view.findViewById(R.id.settings)\n        aboutApp = view.findViewById(R.id.about_app)', kt)
+if 'private lateinit var aboutApp: TextView' not in kt:
+    kt = re.sub(
+        r'private lateinit var settings: TextView',
+        r'private lateinit var settings: TextView\n    private lateinit var aboutApp: TextView',
+        kt
+    )
+    kt = re.sub(
+        r'settings = view\.findViewById\(R\.id\.settings\)',
+        r'settings = view.findViewById(R.id.settings)\n        aboutApp = view.findViewById(R.id.about_app)',
+        kt
+    )
 
 about_logic = """
         aboutApp.setOnClickListener {
             showAboutDialog()
         }
 """
-kt = re.sub(r'settings\.setOnClickListener \{', about_logic + '\n        settings.setOnClickListener {', kt)
+if 'showAboutDialog()' not in kt:
+    kt = re.sub(r'settings\.setOnClickListener \{', about_logic + '\n        settings.setOnClickListener {', kt)
 
 dialog_method = """
     private fun showAboutDialog() {
@@ -51,10 +85,8 @@ dialog_method = """
         val textAbout = dialogView.findViewById<TextView>(R.id.text_about)
         
         val aboutText = "<b>Kupido player 2 Beta</b><br><br>" +
-                "Developed by NoishiXzen, for more tools or apps follow <a href=\\"https://aivorygen.netlify.app\\">aivorygen.netlify.app</a><br><br>" +
-                "<b>Github:</b> <a href=\\"https://github.com/pushpajit-dev\\">https://github.com/pushpajit-dev</a><br>" +
-                "<b>Discord:</b> NoishiXzen<br>" +
-                "<b>Youtube:</b> <a href=\\"https://www.youtube.com/@AivoryGen\\">https://www.youtube.com/@AivoryGen</a><br><br>" +
+                "Developed by <b>Raja_Nisarul</b><br><br>" +
+                "<b>Github:</b> <a href=\\"https://github.com/Bindassrkks\\">https://github.com/Bindassrkks</a><br><br>" +
                 "<b>Libraries / Components:</b><br>" +
                 "• Jetpack Compose &amp; Material 3<br>" +
                 "• Media3 (ExoPlayer)<br>" +
@@ -73,8 +105,8 @@ dialog_method = """
     }
 """
 
-kt = re.sub(r'fun terminateApp\(\) \{', dialog_method + '\n    fun terminateApp() {', kt)
+if 'fun showAboutDialog()' not in kt:
+    kt = kt.replace('fun terminateApp() {', dialog_method + '\n    fun terminateApp() {')
 
 with open('app/src/main/java/com/deniscerri/ytdl/ui/more/MoreFragment.kt', 'w') as f:
     f.write(kt)
-
