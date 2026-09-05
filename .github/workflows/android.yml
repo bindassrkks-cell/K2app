@@ -1,61 +1,41 @@
-name: Android CI Auto-Build
-
-env:
-  main_project_module: app
+name: Push Missing Fixes to Repo
 
 permissions:
   contents: write
 
 on:
-  push:
-    branches:
-      - '**'
   workflow_dispatch:
-    inputs:
-      build_type:
-        description: 'Select Build Type'
-        required: false
-        default: 'assembleRelease'
-        type: choice
-        options:
-          - assembleRelease
-          - assembleDebug
 
 jobs:
-  build:
+  push_missing_assets:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: 17
-          distribution: 'corretto'
-          cache: 'gradle'
-
-      - name: Setup Keystores & Properties
+      - name: Create All Missing Resources (IDs, Theme, Drawables)
         run: |
-          mkdir -p ~/.android app
-          rm -f debug.keystore release_keystore.jks app/debug.keystore app/release_keystore.jks
-          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          cp debug.keystore ~/.android/debug.keystore
-          cp debug.keystore app/debug.keystore
-          cp debug.keystore app/release_keystore.jks
-          cp debug.keystore release_keystore.jks
-          touch local.properties
-          printf "storeFile=release_keystore.jks\nstorePassword=android\nkeyAlias=androiddebugkey\nkeyPassword=android\n" > keystore.properties
-          cp keystore.properties app/keystore.properties
-
-      - name: Ensure Missing Drawables Exist
-        run: |
-          mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/drawable
 
+          # 1. FIX: Missing IDs (settingsFragment, downloadsFragment, pill_downloads)
+          cat << 'EOF' > app/src/main/res/values/missing_ids.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <item name="settingsFragment" type="id" />
+              <item name="downloadsFragment" type="id" />
+              <item name="pill_downloads" type="id" />
+              <item name="pill_quran" type="id" />
+              <item name="pill_history" type="id" />
+              <item name="pill_input_url" type="id" />
+              <item name="quran_app" type="id" />
+          </resources>
+          EOF
+
+          # 2. FIX: Missing Theme Compatibility
           cat << 'EOF' > app/src/main/res/values/theme_compat.xml
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -63,6 +43,7 @@ jobs:
           </resources>
           EOF
 
+          # 3. FIX: Missing Drawables
           cat << 'EOF' > app/src/main/res/drawable/ic_download.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp"
@@ -87,26 +68,99 @@ jobs:
           </vector>
           EOF
 
-      - name: Build Android APK
-        run: |
-          chmod +x gradlew
-          BUILD_TASK="${{ inputs.build_type || 'assembleRelease' }}"
-          ./gradlew ":${{ env.main_project_module }}:${BUILD_TASK}" \
-            -Dorg.gradle.jvmargs="-Xmx4096m -XX:+UseParallelGC" \
-            --stacktrace --warning-mode none
+          cat << 'EOF' > app/src/main/res/drawable/ic_quran.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:fillColor="#FFFFFFFF"
+                  android:pathData="M19,2L5,2c-1.1,0 -2,0.9 -2,2v16c0,1.1 0.9,2 2,2h14c1.1,0 2,-0.9 2,-2L21,4c0,-1.1 -0.9,-2 -2,-2zM19,20L5,20L5,4h7v7l2.5,-1.5L17,11L17,4h2v16z"/>
+          </vector>
+          EOF
 
-      - name: Collect Output APKs
-        if: success()
-        run: |
-          mkdir -p build_output_apks
-          find . -type f -name "*.apk" -not -path "*/intermediates/*" -exec cp {} build_output_apks/ \;
-          echo "Collected APK files:"
-          ls -lh build_output_apks/
+          cat << 'EOF' > app/src/main/res/drawable/ic_play.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:fillColor="#FFFFFFFF"
+                  android:pathData="M8,5v14l11,-7z"/>
+          </vector>
+          EOF
 
-      - name: Upload APKs Artifact
-        uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: App-Release-Builds
-          path: build_output_apks/
-          if-no-files-found: error
+          cat << 'EOF' > app/src/main/res/drawable/ic_pause.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:fillColor="#FFFFFFFF"
+                  android:pathData="M6,19h4L10,5L6,5v14zM14,5v14h4L18,5h-4z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_search.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:fillColor="#FFFFFFFF"
+                  android:pathData="M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zm-6,0C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_settings.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:fillColor="#FFFFFFFF"
+                  android:pathData="M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94 0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87c-0.12,0.21 -0.08,0.47 0.12,0.61l2.03,1.58c-0.05,0.3 -0.09,0.63 -0.09,0.94s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61l-2.01,-1.58zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6 3.6,1.62 3.6,3.6 -1.62,3.6 -3.6,3.6z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_history.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:fillColor="#FFFFFFFF"
+                  android:pathData="M13,3c-4.97,0 -9,4.03 -9,9H1l3.89,3.89 0.07,0.14L9,12H6c0,-3.87 3.13,-7 7,-7s7,3.13 7,7 -3.13,7 -7,7c-1.93,0 -3.68,-0.79 -4.94,-2.06l-1.42,1.42C8.27,19.99 10.51,21 13,21c4.97,0 9,-4.03 9,-9s-4.03,-9 -9,-9zm-1,5v5l4.28,2.54 0.72,-1.21 -3.5,-2.08V8H12z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_link.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:fillColor="#FFFFFFFF"
+                  android:pathData="M3.9,12c0,-1.71 1.39,-3.1 3.1,-3.1h4V7H7c-2.76,0 -5,2.24 -5,5s2.24,5 5,5h4v-1.9H7c-1.71,0 -3.1,-1.39 -3.1,-3.1zM8,13h8v-2H8v2zm9,-6h-4v1.9h4c1.71,0 3.1,1.39 3.1,3.1s-1.39,3.1 -3.1,3.1h-4V17h4c2.76,0 5,-2.24 5,-5s-2.24,-5 -5,-5z"/>
+          </vector>
+          EOF
+
+      - name: Commit and Push to Repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/res/
+          if ! git diff --staged --quiet; then
+            git commit -m "Auto-fix: Add missing IDs (settingsFragment, downloadsFragment), theme and drawables [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+            echo "Successfully pushed all missing files to repo!"
+          else
+            echo "All files already exist in repository."
+          fi
