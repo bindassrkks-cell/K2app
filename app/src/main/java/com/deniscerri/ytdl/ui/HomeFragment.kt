@@ -1,7 +1,4 @@
 package com.deniscerri.ytdl.ui
-import com.deniscerri.ytdl.ui.quran.QuranActivity
-import org.json.JSONArray
-import java.net.URL
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -35,6 +32,7 @@ import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.view.ActionMode
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.os.bundleOf
@@ -63,6 +61,7 @@ import com.deniscerri.ytdl.database.viewmodel.ResultViewModel
 import com.deniscerri.ytdl.ui.adapter.HomeAdapter
 import com.deniscerri.ytdl.ui.adapter.SearchSuggestionsAdapter
 import com.deniscerri.ytdl.ui.more.cookies.WebViewActivity
+import com.deniscerri.ytdl.ui.quran.QuranActivity
 import com.deniscerri.ytdl.util.Extensions.enableFastScroll
 import com.deniscerri.ytdl.util.Extensions.isURL
 import com.deniscerri.ytdl.util.NotificationUtil
@@ -85,6 +84,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import java.net.URL
 
 class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggestionsAdapter.OnItemClickListener, OnClickListener {
@@ -135,13 +135,19 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
     private var showDownloadAllFab: Boolean = false
     private var showClipboardFab: Boolean = false
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Set Permanent AMOLED Dark Mode
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
         fragmentView = inflater.inflate(R.layout.fragment_home, container, false)
         activity = getActivity()
-        mainActivity = activity as MainActivity?
+        mainActivity = activity as? MainActivity
         quickLaunchSheet = false
         notificationUtil = NotificationUtil(requireContext())
         return fragmentView
@@ -149,14 +155,6 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-        view.findViewById<android.view.View>(R.id.pill_quran)?.setOnClickListener {
-            startActivity(android.content.Intent(requireContext(), QuranActivity::class.java))
-        }
-        view.findViewById<android.view.View>(R.id.pill_history)?.setOnClickListener {
-            loadIslamicHomeContent()
-        }
-        
 
         fragmentContext = context
         layoutinflater = LayoutInflater.from(context)
@@ -186,33 +184,38 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
         shimmerCards = view.findViewById(R.id.shimmer_results_framelayout)
 
         // ==========================================
-        // CONNECTED FEATURES (SETTINGS / DOWNLOADS / SEARCH / URL)
+        // CONNECTED FEATURES & ACTION PILLS
         // ==========================================
-        
-        // 1. Settings Icon Click -> Open Settings / More Fragment
+
+        // 1. Al-Quran Feature Pill
+        view.findViewById<View>(R.id.pill_quran)?.setOnClickListener {
+            startActivity(Intent(requireContext(), QuranActivity::class.java))
+        }
+
+        // 2. Islamic Stream / Feed Pill
+        view.findViewById<View>(R.id.pill_history)?.setOnClickListener {
+            loadIslamicHomeContent()
+            Toast.makeText(context, "Streaming Islamic Feed...", Toast.LENGTH_SHORT).show()
+        }
+
+        // 3. Settings Icon
         view.findViewById<ImageView>(R.id.btn_settings)?.setOnClickListener {
             openSettingsScreen()
         }
 
-        // 2. Quick Search Icon Click
+        // 4. Quick Search Icon
         view.findViewById<ImageView>(R.id.btn_quick_search)?.setOnClickListener {
             searchBar?.performClick()
         }
 
-        // 3. Category Pill: Downloads Click -> Open Downloads
-        view.findViewById<LinearLayout>(R.id.pill_downloads)?.setOnClickListener {
+        // 5. Category Pill: Downloads
+        view.findViewById<View>(R.id.pill_downloads)?.setOnClickListener {
             openDownloadsScreen()
         }
 
-        // 4. Category Pill: Paste URL / Input Dialog
-        view.findViewById<LinearLayout>(R.id.pill_input_url)?.setOnClickListener {
+        // 6. Category Pill: Paste URL / Input Dialog
+        view.findViewById<View>(R.id.pill_input_url)?.setOnClickListener {
             showDirectUrlInputDialog()
-        }
-
-        // 5. Category Pill: Watch Again (History / Refresh)
-        view.findViewById<LinearLayout>(R.id.pill_history)?.setOnClickListener {
-            resultViewModel.getHomeRecommendations()
-            Toast.makeText(context, "Refreshed recommendations", Toast.LENGTH_SHORT).show()
         }
 
         // Recycler View Setup
@@ -387,6 +390,36 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
     }
 
     // ==========================================
+    // ISLAMIC CONTENT LOADER
+    // ==========================================
+    private fun loadIslamicHomeContent() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val jsonUrl = "https://raw.githubusercontent.com/Bindassrkks/K2app/main/data.json"
+                val text = URL(jsonUrl).readText()
+                val jsonArray = JSONArray(text)
+                val urls = mutableListOf<String>()
+                for (i in 0 until jsonArray.length()) {
+                    val obj = jsonArray.getJSONObject(i)
+                    val url = obj.optString("url")
+                    if (url.isNotEmpty()) urls.add(url)
+                }
+
+                if (urls.isNotEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        resultViewModel.deleteAll()
+                        resultViewModel.parseQueries(urls) {}
+                    }
+                } else {
+                    withContext(Dispatchers.Main) { resultViewModel.checkTrending() }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { resultViewModel.checkTrending() }
+            }
+        }
+    }
+
+    // ==========================================
     // NAVIGATION HANDLERS (SETTINGS & DOWNLOADS)
     // ==========================================
 
@@ -397,7 +430,6 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
             try {
                 findNavController().navigate(R.id.settingsFragment)
             } catch (e2: Exception) {
-                // Fallback: Click bottom navigation More/Settings icon
                 requireActivity().findViewById<View>(R.id.moreFragment)?.performClick()
             }
         }
@@ -626,7 +658,7 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
         if (searchView!!.editText.text.isEmpty()) {
             searchView!!.editText.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
         } else {
-            searchView!!.editText.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_plus, 0)
+            searchView!!.editText.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_link, 0)
         }
 
         val combinedList = mutableListOf<SearchSuggestionItem>()
@@ -717,8 +749,8 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
     }
 
     fun scrollToTop() {
-        recyclerView!!.scrollToPosition(0)
-        runCatching { (searchBar!!.parent as AppBarLayout).setExpanded(true, true) }
+        recyclerView?.scrollToPosition(0)
+        runCatching { appBarLayout?.setExpanded(true, true) }
     }
 
     @SuppressLint("ResourceType")
@@ -804,12 +836,12 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
         override fun onCreateActionMode(mode: ActionMode?, menu: Menu?): Boolean {
             mode!!.menuInflater.inflate(R.menu.main_menu_context, menu)
             mode.title = "${homeAdapter.getSelectedObjectsCount(totalCount)} ${getString(R.string.selected)}"
-            searchBar!!.isEnabled = false
+            searchBar?.isEnabled = false
             playlistNameFilterChipGroup.children.forEach { it.isEnabled = false }
-            searchBar!!.menu.forEach { it.isEnabled = false }
-            (activity as MainActivity).disableBottomNavigation()
-            downloadAllFab!!.isVisible = false
-            clipboardFab!!.isVisible = false
+            searchBar?.menu?.forEach { it.isEnabled = false }
+            (activity as? MainActivity)?.disableBottomNavigation()
+            downloadAllFab?.isVisible = false
+            clipboardFab?.isVisible = false
             return true
         }
 
@@ -855,7 +887,7 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
                         if (showDownloadCard && selectedObjects.size == 1) {
                             val resultItem = withContext(Dispatchers.IO) { resultViewModel.getByID(selectedObjects.first()) }
                             resultItem?.apply {
-                                showSingleDownloadSheet(resultItem, downloadViewModel.getDownloadType(url = resultItem.url))
+                                showSingleDownloadSheet(resultItem, downloadViewModel.getDownloadType(DownloadType.video, resultItem.url))
                             }
                         } else {
                             downloadViewModel.turnResultItemsToProcessingDownloads(selectedObjects, downloadNow = !showDownloadCard)
@@ -885,14 +917,14 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
 
         override fun onDestroyActionMode(mode: ActionMode?) {
             actionMode = null
-            (activity as MainActivity).enableBottomNavigation()
+            (activity as? MainActivity)?.enableBottomNavigation()
             homeAdapter.clearCheckedItems()
-            searchBar!!.isEnabled = true
+            searchBar?.isEnabled = true
             playlistNameFilterChipGroup.children.forEach { it.isEnabled = true }
-            searchBar!!.menu.forEach { it.isEnabled = true }
-            searchBar?.expand(appBarLayout!!)
-            downloadAllFab!!.isVisible = showDownloadAllFab
-            clipboardFab!!.isVisible = showClipboardFab
+            searchBar?.menu?.forEach { it.isEnabled = true }
+            appBarLayout?.setExpanded(true, true)
+            downloadAllFab?.isVisible = showDownloadAllFab
+            clipboardFab?.isVisible = showClipboardFab
         }
 
         suspend fun getSelectedIDs(): List<Long> {
@@ -907,8 +939,8 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
     private fun checkClipboard(): List<String>? {
         return kotlin.runCatching {
             val clipboard = requireContext().getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = clipboard.primaryClip!!.getItemAt(0).text
-            return clip.split("\r", "\n").map { it.trim() }.filter { Patterns.WEB_URL.matcher(it).matches() }
+            val clip = clipboard.primaryClip?.getItemAt(0)?.text ?: return null
+            clip.split("\r", "\n").map { it.trim() }.filter { Patterns.WEB_URL.matcher(it).matches() }
         }.getOrNull()
     }
 
@@ -917,7 +949,7 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
         if (res.size == 1) {
             showClipboardFab = false
             clipboardFab?.isVisible = false
-            searchView!!.setText(text)
+            searchView?.setText(text)
             initSearch(searchView!!)
         } else {
             res.forEach { onSearchSuggestionAdd(it) }
@@ -927,21 +959,21 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
     override fun onSearchSuggestionAdd(text: String) {
         val items = text.split("\n")
         items.forEach { t ->
-            val present = queriesChipGroup!!.children.firstOrNull { (it as Chip).text.toString() == t }
+            val present = queriesChipGroup?.children?.firstOrNull { (it as Chip).text.toString() == t }
             if (present == null) {
                 val chip = layoutinflater!!.inflate(R.layout.input_chip, queriesChipGroup, false) as Chip
                 chip.text = t
                 chip.chipBackgroundColor = ColorStateList.valueOf(MaterialColors.getColor(requireContext(), R.attr.colorSecondaryContainer, Color.BLACK))
                 chip.setOnClickListener {
-                    if (queriesChipGroup!!.childCount == 1) queriesConstraint!!.visibility = View.GONE
-                    queriesChipGroup!!.removeView(chip)
+                    if (queriesChipGroup?.childCount == 1) queriesConstraint?.visibility = View.GONE
+                    queriesChipGroup?.removeView(chip)
                 }
-                queriesChipGroup!!.addView(chip)
+                queriesChipGroup?.addView(chip)
             }
         }
 
-        searchView!!.editText.setText("")
-        queriesConstraint?.isVisible = queriesChipGroup?.childCount!! > 0
+        searchView?.editText?.setText("")
+        queriesConstraint?.isVisible = (queriesChipGroup?.childCount ?: 0) > 0
 
         searchSuggestionsAdapter?.getList()?.apply {
             if (this.isNotEmpty() && this.first().type == SearchSuggestionType.CLIPBOARD) {
@@ -957,14 +989,14 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
         deleteDialog.setNegativeButton(getString(R.string.cancel)) { dialogInterface: DialogInterface, _: Int -> dialogInterface.cancel() }
         deleteDialog.setPositiveButton(getString(R.string.ok)) { _: DialogInterface?, _: Int ->
             resultViewModel.removeSearchQueryFromHistory(text)
-            updateSearchViewItems(searchView!!.editText.text.toString())
+            updateSearchViewItems(searchView?.editText?.text.toString())
         }
         deleteDialog.show()
     }
 
     override fun onSearchSuggestionAddToSearchBar(text: String) {
-        searchView!!.editText.setText(text)
-        searchView!!.editText.setSelection(searchView!!.editText.length())
+        searchView?.editText?.setText(text)
+        searchView?.editText?.let { it.setSelection(it.length()) }
     }
 
     private fun updateMultiplePlaylistResults(playlistTitles: List<String>) {
