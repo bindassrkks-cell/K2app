@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:gravity="center_horizontal">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Terms &amp; Conditions"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:layout_marginTop="24dp"
+        android:layout_marginBottom="24dp" />
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginBottom="24dp"
+        app:cardElevation="0dp"
+        app:strokeWidth="1dp"
+        app:strokeColor="?attr/colorOutlineVariant"
+        app:cardBackgroundColor="?attr/colorSurfaceContainerLowest"
+        app:cardCornerRadius="16dp">
+        
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="16dp">
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Welcome! These terms and conditions outline the rules and regulations for the use of our Application. \n\nBy accessing this app, we assume you accept these terms and conditions. Do not continue to use the app if you do not agree to take all of the terms and conditions stated on this page.\n\n1. License\nUnless otherwise stated, we or our licensors own the intellectual property rights for all material on the app. All intellectual property rights are reserved.\n\n2. User Content\nYou grant us a non-exclusive license to use, reproduce, and edit any of your content.\n\n3. Privacy\nWe respect your privacy and are committed to protecting it. Please read our Privacy Policy for more details.\n\n4. Content Liability\nWe shall not be held responsible for any content that appears on your app.\n\n5. Disclaimer\nTo the maximum extent permitted by applicable law, we exclude all representations, warranties and conditions relating to our app and the use of this app."
+                android:textSize="14sp"
+                android:lineSpacingExtra="4dp"/>
+        </ScrollView>
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/checkbox_tc"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="I accept the Terms and Conditions"
+        android:textSize="16sp"/>
+</LinearLayout>

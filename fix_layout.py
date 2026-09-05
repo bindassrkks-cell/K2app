@@ -1,0 +1,232 @@
+import re
+
+with open('/tmp/result.xml', 'r') as f:
+    content = f.read()
+
+new_layout = """<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?android:colorBackground">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/frame_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#000000">
+
+        <androidx.media3.ui.PlayerView
+            android:id="@+id/video_view"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:keepScreenOn="true"
+            app:layout_constraintDimensionRatio="H,16:9"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:resize_mode="fit"
+            app:use_controller="true" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/pip_button"
+            style="@style/Widget.Material3.Button.IconButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/ic_music"
+            android:contentDescription="Picture in Picture"
+            app:iconSize="30dp"
+            app:iconTint="#FFFFFF"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/download_thumb"
+            style="@style/Widget.Material3.Button.IconButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/ic_image"
+            android:contentDescription="@string/save_thumb"
+            app:iconSize="30dp"
+            app:iconTint="#FFFFFF"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/share_button"
+            style="@style/Widget.Material3.Button.IconButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/baseline_share_24"
+            android:contentDescription="Share Video"
+            app:iconSize="30dp"
+            app:iconTint="#FFFFFF"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/download_thumb" />
+            
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/open_button"
+            style="@style/Widget.Material3.Button.IconButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/baseline_open_in_browser_24"
+            android:contentDescription="Open in External Player"
+            app:iconSize="30dp"
+            app:iconTint="#FFFFFF"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/share_button" />
+            
+        <ProgressBar
+            android:id="@+id/loading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toTopOf="@+id/video_view"
+            app:layout_constraintBottom_toBottomOf="@+id/video_view"
+            app:layout_constraintStart_toStartOf="@+id/video_view"
+            app:layout_constraintEnd_toEndOf="@+id/video_view" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/list_section_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/list_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp">
+
+            <TextView
+                android:id="@+id/title"
+                android:layout_width="0dp"
+                android:textStyle="bold"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:singleLine="false"
+                android:text="@string/app_name"
+                android:textSize="17sp"
+                app:layout_constraintEnd_toStartOf="@+id/download_music"
+                app:layout_constraintHorizontal_bias="0.0"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <TextView
+                android:id="@+id/bottom_info"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:ellipsize="end"
+                android:singleLine="false"
+                android:text="@string/app_name"
+                android:textSize="12sp"
+                app:layout_constraintEnd_toStartOf="@+id/download_music"
+                app:layout_constraintHorizontal_bias="0.0"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/title" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/download_music"
+                style="@style/Widget.Material3.ExtendedFloatingActionButton.Icon.Secondary"
+                android:layout_width="55dp"
+                android:layout_height="55dp"
+                android:layout_marginEnd="8dp"
+                app:elevation="0dp"
+                android:elevation="0dp"
+                app:borderWidth="0dp"
+                android:stateListAnimator="@null"
+                android:contentDescription="@string/audio"
+                app:icon="@drawable/ic_music"
+                app:layout_constraintEnd_toStartOf="@+id/download_video"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/download_video"
+                style="@style/Widget.Material3.ExtendedFloatingActionButton.Icon.Secondary"
+                android:layout_width="55dp"
+                android:layout_height="55dp"
+                app:elevation="0dp"
+                android:elevation="0dp"
+                android:stateListAnimator="@null"
+                android:contentDescription="@string/video"
+                app:icon="@drawable/ic_video"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <androidx.constraintlayout.widget.Barrier
+                android:id="@+id/title_barrier"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:barrierDirection="bottom"
+                app:constraint_referenced_ids="bottom_info,download_music" />
+
+            <TextView
+                android:id="@+id/running"
+                android:visibility="gone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/running"
+                android:textStyle="bold"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/title_barrier" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/running_recycler"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/running" />
+
+            <TextView
+                android:id="@+id/queued"
+                android:visibility="gone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/download_queue"
+                android:textStyle="bold"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/running_recycler" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/queued_recycler"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/queued" />
+
+            <Button
+                android:id="@+id/bottom_sheet_link"
+                style="@style/Widget.Material3.Button.TextButton.Icon"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:singleLine="true"
+                android:text="@string/app_name"
+                android:textAlignment="textStart"
+                android:textSize="15sp"
+                app:icon="@drawable/ic_link"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/queued_recycler" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>
+"""
+
+with open('app/src/main/res/layout/result_card_details.xml', 'w') as f:
+    f.write(new_layout)
+
