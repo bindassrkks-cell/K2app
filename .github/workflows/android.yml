@@ -56,84 +56,89 @@ jobs:
           printf "storeFile=release_keystore.jks\nstorePassword=android\nkeyAlias=androiddebugkey\nkeyPassword=android\n" > keystore.properties
           cp keystore.properties app/keystore.properties
 
-      - name: Apply AMOLED UI, Quran Feature & Islamic Feed
+      - name: Apply Theme Fix, AMOLED UI, Quran Feature & Islamic Feed
         run: |
-          python3 - << 'EOF'
-          import os
-          import re
-
-          # 0. THEME AUTO-COMPATIBILITY FIX (Prevents AAPT Theme Not Found Error)
-          values_dir = 'app/src/main/res/values'
-          os.makedirs(values_dir, exist_ok=True)
-          with open(os.path.join(values_dir, 'theme_compat.xml'), 'w', encoding='utf-8') as f:
-              f.write('''<?xml version="1.0" encoding="utf-8"?>
+          # 1. FIX THEME COMPATIBILITY (Prevents AAPT Theme.YTDLnis error)
+          mkdir -p app/src/main/res/values
+          cat << 'EOF' > app/src/main/res/values/theme_compat.xml
+          <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <style name="Theme.YTDLnis" parent="Theme.Material3.DayNight.NoActionBar" />
-          </resources>''')
+          </resources>
+          EOF
 
-          # 1. VECTOR DRAWABLES
-          drawable_dir = 'app/src/main/res/drawable'
-          os.makedirs(drawable_dir, exist_ok=True)
+          # 2. DRAWABLES SETUP
+          mkdir -p app/src/main/res/drawable
 
-          drawables = {
-              'ic_more_vert.xml': '''<vector xmlns:android="http://schemas.android.com/apk/res/android"
-                  android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-                  <path android:fillColor="#FFFFFFFF" android:pathData="M12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zm0,2c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zm0,6c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z"/>
-              </vector>''',
+          cat << 'EOF' > app/src/main/res/drawable/ic_more_vert.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zm0,2c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zm0,6c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z"/>
+          </vector>
+          EOF
 
-              'ic_quran.xml': '''<vector xmlns:android="http://schemas.android.com/apk/res/android"
-                  android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-                  <path android:fillColor="#FFFFFFFF" android:pathData="M19,2L5,2c-1.1,0 -2,0.9 -2,2v16c0,1.1 0.9,2 2,2h14c1.1,0 2,-0.9 2,-2L21,4c0,-1.1 -0.9,-2 -2,-2zM19,20L5,20L5,4h7v7l2.5,-1.5L17,11L17,4h2v16z"/>
-              </vector>''',
+          cat << 'EOF' > app/src/main/res/drawable/ic_quran.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M19,2L5,2c-1.1,0 -2,0.9 -2,2v16c0,1.1 0.9,2 2,2h14c1.1,0 2,-0.9 2,-2L21,4c0,-1.1 -0.9,-2 -2,-2zM19,20L5,20L5,4h7v7l2.5,-1.5L17,11L17,4h2v16z"/>
+          </vector>
+          EOF
 
-              'ic_play.xml': '''<vector xmlns:android="http://schemas.android.com/apk/res/android"
-                  android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-                  <path android:fillColor="#FFFFFFFF" android:pathData="M8,5v14l11,-7z"/>
-              </vector>''',
+          cat << 'EOF' > app/src/main/res/drawable/ic_play.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M8,5v14l11,-7z"/>
+          </vector>
+          EOF
 
-              'ic_pause.xml': '''<vector xmlns:android="http://schemas.android.com/apk/res/android"
-                  android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-                  <path android:fillColor="#FFFFFFFF" android:pathData="M6,19h4L10,5L6,5v14zM14,5v14h4L18,5h-4z"/>
-              </vector>''',
+          cat << 'EOF' > app/src/main/res/drawable/ic_pause.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M6,19h4L10,5L6,5v14zM14,5v14h4L18,5h-4z"/>
+          </vector>
+          EOF
 
-              'ic_search.xml': '''<vector xmlns:android="http://schemas.android.com/apk/res/android"
-                  android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-                  <path android:fillColor="#FFFFFFFF" android:pathData="M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zm-6,0C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z"/>
-              </vector>''',
+          cat << 'EOF' > app/src/main/res/drawable/ic_search.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zm-6,0C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z"/>
+          </vector>
+          EOF
 
-              'ic_settings.xml': '''<vector xmlns:android="http://schemas.android.com/apk/res/android"
-                  android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-                  <path android:fillColor="#FFFFFFFF" android:pathData="M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94 0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87c-0.12,0.21 -0.08,0.47 0.12,0.61l2.03,1.58c-0.05,0.3 -0.09,0.63 -0.09,0.94s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61l-2.01,-1.58zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6 3.6,1.62 3.6,3.6 -1.62,3.6 -3.6,3.6z"/>
-              </vector>''',
+          cat << 'EOF' > app/src/main/res/drawable/ic_settings.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94 0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87c-0.12,0.21 -0.08,0.47 0.12,0.61l2.03,1.58c-0.05,0.3 -0.09,0.63 -0.09,0.94s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61l-2.01,-1.58zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6 3.6,1.62 3.6,3.6 -1.62,3.6 -3.6,3.6z"/>
+          </vector>
+          EOF
 
-              'ic_history.xml': '''<vector xmlns:android="http://schemas.android.com/apk/res/android"
-                  android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-                  <path android:fillColor="#FFFFFFFF" android:pathData="M13,3c-4.97,0 -9,4.03 -9,9H1l3.89,3.89 0.07,0.14L9,12H6c0,-3.87 3.13,-7 7,-7s7,3.13 7,7 -3.13,7 -7,7c-1.93,0 -3.68,-0.79 -4.94,-2.06l-1.42,1.42C8.27,19.99 10.51,21 13,21c4.97,0 9,-4.03 9,-9s-4.03,-9 -9,-9zm-1,5v5l4.28,2.54 0.72,-1.21 -3.5,-2.08V8H12z"/>
-              </vector>''',
+          cat << 'EOF' > app/src/main/res/drawable/ic_history.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M13,3c-4.97,0 -9,4.03 -9,9H1l3.89,3.89 0.07,0.14L9,12H6c0,-3.87 3.13,-7 7,-7s7,3.13 7,7 -3.13,7 -7,7c-1.93,0 -3.68,-0.79 -4.94,-2.06l-1.42,1.42C8.27,19.99 10.51,21 13,21c4.97,0 9,-4.03 9,-9s-4.03,-9 -9,-9zm-1,5v5l4.28,2.54 0.72,-1.21 -3.5,-2.08V8H12z"/>
+          </vector>
+          EOF
 
-              'ic_download.xml': '''<vector xmlns:android="http://schemas.android.com/apk/res/android"
-                  android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-                  <path android:fillColor="#FFFFFFFF" android:pathData="M19,9h-4V3H9v6H5l7,7 7,-7zM5,18v2h14v-2H5z"/>
-              </vector>''',
+          cat << 'EOF' > app/src/main/res/drawable/ic_download.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M19,9h-4V3H9v6H5l7,7 7,-7zM5,18v2h14v-2H5z"/>
+          </vector>
+          EOF
 
-              'ic_link.xml': '''<vector xmlns:android="http://schemas.android.com/apk/res/android"
-                  android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-                  <path android:fillColor="#FFFFFFFF" android:pathData="M3.9,12c0,-1.71 1.39,-3.1 3.1,-3.1h4V7H7c-2.76,0 -5,2.24 -5,5s2.24,5 5,5h4v-1.9H7c-1.71,0 -3.1,-1.39 -3.1,-3.1zM8,13h8v-2H8v2zm9,-6h-4v1.9h4c1.71,0 3.1,1.39 3.1,3.1s-1.39,3.1 -3.1,3.1h-4V17h4c2.76,0 5,-2.24 5,-5s-2.24,-5 -5,-5z"/>
-              </vector>'''
-          }
+          cat << 'EOF' > app/src/main/res/drawable/ic_link.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:pathData="M3.9,12c0,-1.71 1.39,-3.1 3.1,-3.1h4V7H7c-2.76,0 -5,2.24 -5,5s2.24,5 5,5h4v-1.9H7c-1.71,0 -3.1,-1.39 -3.1,-3.1zM8,13h8v-2H8v2zm9,-6h-4v1.9h4c1.71,0 3.1,1.39 3.1,3.1s-1.39,3.1 -3.1,3.1h-4V17h4c2.76,0 5,-2.24 5,-5s-2.24,-5 -5,-5z"/>
+          </vector>
+          EOF
 
-          for name, content in drawables.items():
-              with open(os.path.join(drawable_dir, name), 'w', encoding='utf-8') as f:
-                  f.write(content)
+          # 3. QURAN MODULE & LAYOUTS
+          mkdir -p app/src/main/java/com/deniscerri/ytdl/ui/quran
+          mkdir -p app/src/main/res/layout
 
-          # 2. QURAN MODULE SETUP
-          quran_dir = 'app/src/main/java/com/deniscerri/ytdl/ui/quran'
-          os.makedirs(quran_dir, exist_ok=True)
-          layout_dir = 'app/src/main/res/layout'
-          os.makedirs(layout_dir, exist_ok=True)
-
-          with open(os.path.join(layout_dir, 'activity_quran.xml'), 'w', encoding='utf-8') as f:
-              f.write('''<?xml version="1.0" encoding="utf-8"?>
+          cat << 'EOF' > app/src/main/res/layout/activity_quran.xml
+          <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               xmlns:app="http://schemas.android.com/apk/res-auto"
               android:layout_width="match_parent"
@@ -244,10 +249,11 @@ jobs:
                       app:tint="#A0A0A0"
                       android:padding="6dp" />
               </LinearLayout>
-          </LinearLayout>''')
+          </LinearLayout>
+          EOF
 
-          with open(os.path.join(layout_dir, 'item_surah.xml'), 'w', encoding='utf-8') as f:
-              f.write('''<?xml version="1.0" encoding="utf-8"?>
+          cat << 'EOF' > app/src/main/res/layout/item_surah.xml
+          <?xml version="1.0" encoding="utf-8"?>
           <com.google.android.material.card.MaterialCardView 
               xmlns:android="http://schemas.android.com/apk/res/android"
               xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -315,10 +321,11 @@ jobs:
                       app:tint="#00E676"
                       android:padding="6dp" />
               </LinearLayout>
-          </com.google.android.material.card.MaterialCardView>''')
+          </com.google.android.material.card.MaterialCardView>
+          EOF
 
-          with open(os.path.join(layout_dir, 'dialog_quran_surah.xml'), 'w', encoding='utf-8') as f:
-              f.write('''<?xml version="1.0" encoding="utf-8"?>
+          cat << 'EOF' > app/src/main/res/layout/dialog_quran_surah.xml
+          <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
@@ -354,10 +361,11 @@ jobs:
                       android:textSize="15sp"
                       android:lineSpacingMultiplier="1.3" />
               </ScrollView>
-          </LinearLayout>''')
+          </LinearLayout>
+          EOF
 
-          with open(os.path.join(quran_dir, 'QuranActivity.kt'), 'w', encoding='utf-8') as f:
-              f.write('''package com.deniscerri.ytdl.ui.quran
+          cat << 'EOF' > app/src/main/java/com/deniscerri/ytdl/ui/quran/QuranActivity.kt
+          package com.deniscerri.ytdl.ui.quran
 
           import android.media.AudioAttributes
           import android.media.MediaPlayer
@@ -609,68 +617,12 @@ jobs:
                   list = newList
                   notifyDataSetChanged()
               }
-          }''')
+          }
+          EOF
 
-          # 3. REGISTER QURANACTIVITY IN ANDROIDMANIFEST.XML (Without explicit theme, so it inherits safely)
-          manifest_path = 'app/src/main/AndroidManifest.xml'
-          if os.path.exists(manifest_path):
-              with open(manifest_path, 'r', encoding='utf-8') as f:
-                  m_content = f.read()
-
-              if 'com.deniscerri.ytdl.ui.quran.QuranActivity' not in m_content:
-                  entry = '''        <activity
-                      android:name="com.deniscerri.ytdl.ui.quran.QuranActivity"
-                      android:exported="false" />
-              </application>'''
-                  m_content = m_content.replace('</application>', entry)
-                  with open(manifest_path, 'w', encoding='utf-8') as f:
-                      f.write(m_content)
-
-          # 4. ADD QURAN BUTTON TO MORE SCREEN
-          more_xml_path = 'app/src/main/res/layout/fragment_more.xml'
-          if os.path.exists(more_xml_path):
-              with open(more_xml_path, 'r', encoding='utf-8') as f:
-                  mxml = f.read()
-
-              if 'android:id="@+id/quran_app"' not in mxml:
-                  quran_view = '''            <TextView
-                      android:id="@+id/quran_app"
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:drawablePadding="35dp"
-                      android:textSize="16sp"
-                      android:paddingVertical="15dp"
-                      android:text="Al-Quran (القرآن الكريم)"
-                      android:textColor="#00E676"
-                      android:textStyle="bold"
-                      android:clickable="true"
-                      android:focusable="true"
-                      android:background="?android:attr/selectableItemBackground"
-                      android:paddingHorizontal="15dp"
-                      app:drawableStartCompat="@drawable/ic_quran" />
-          '''
-                  mxml = re.sub(r'(<TextView\s+android:id="@+id/settings".*?/>)', quran_view + r'\1', mxml, flags=re.DOTALL)
-                  with open(more_xml_path, 'w', encoding='utf-8') as f:
-                      f.write(mxml)
-
-          more_kt_path = 'app/src/main/java/com/deniscerri/ytdl/ui/more/MoreFragment.kt'
-          if os.path.exists(more_kt_path):
-              with open(more_kt_path, 'r', encoding='utf-8') as f:
-                  mkt = f.read()
-
-              if 'com.deniscerri.ytdl.ui.quran.QuranActivity' not in mkt:
-                  mkt = "import com.deniscerri.ytdl.ui.quran.QuranActivity\n" + mkt
-                  quran_code = '''        view.findViewById<TextView>(R.id.quran_app)?.setOnClickListener {
-                      startActivity(android.content.Intent(requireContext(), QuranActivity::class.java))
-                  }
-          '''
-                  mkt = mkt.replace('settings = view.findViewById(R.id.settings)', quran_code + '\n        settings = view.findViewById(R.id.settings)')
-                  with open(more_kt_path, 'w', encoding='utf-8') as f:
-                      f.write(mkt)
-
-          # 5. SOCIAL FEED MODULE
-          with open(os.path.join(layout_dir, 'fragment_social_feed.xml'), 'w', encoding='utf-8') as f:
-              f.write('''<?xml version="1.0" encoding="utf-8"?>
+          # 4. SOCIAL FEED MODULE & HOME XML
+          cat << 'EOF' > app/src/main/res/layout/fragment_social_feed.xml
+          <?xml version="1.0" encoding="utf-8"?>
           <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
@@ -689,10 +641,11 @@ jobs:
                   android:layout_height="wrap_content"
                   android:layout_gravity="center"
                   android:visibility="gone" />
-          </FrameLayout>''')
+          </FrameLayout>
+          EOF
 
-          with open(os.path.join(layout_dir, 'item_social_post.xml'), 'w', encoding='utf-8') as f:
-              f.write('''<?xml version="1.0" encoding="utf-8"?>
+          cat << 'EOF' > app/src/main/res/layout/item_social_post.xml
+          <?xml version="1.0" encoding="utf-8"?>
           <com.google.android.material.card.MaterialCardView
               xmlns:android="http://schemas.android.com/apk/res/android"
               xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -752,10 +705,11 @@ jobs:
                           android:textSize="13sp" />
                   </LinearLayout>
               </LinearLayout>
-          </com.google.android.material.card.MaterialCardView>''')
+          </com.google.android.material.card.MaterialCardView>
+          EOF
 
-          with open(os.path.join(layout_dir, 'dialog_social_post_detail.xml'), 'w', encoding='utf-8') as f:
-              f.write('''<?xml version="1.0" encoding="utf-8"?>
+          cat << 'EOF' > app/src/main/res/layout/dialog_social_post_detail.xml
+          <?xml version="1.0" encoding="utf-8"?>
           <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="wrap_content"
@@ -791,11 +745,11 @@ jobs:
                       android:textSize="14sp"
                       android:lineSpacingMultiplier="1.3" />
               </LinearLayout>
-          </ScrollView>''')
+          </ScrollView>
+          EOF
 
-          history_kt_path = 'app/src/main/java/com/deniscerri/ytdl/ui/downloads/HistoryFragment.kt'
-          with open(history_kt_path, 'w', encoding='utf-8') as f:
-              f.write('''package com.deniscerri.ytdl.ui.downloads
+          cat << 'EOF' > app/src/main/java/com/deniscerri/ytdl/ui/downloads/HistoryFragment.kt
+          package com.deniscerri.ytdl.ui.downloads
 
           import android.graphics.BitmapFactory
           import android.os.Bundle
@@ -947,21 +901,11 @@ jobs:
               }
 
               override fun getItemCount() = list.size
-          }''')
+          }
+          EOF
 
-          # 6. UPDATE BOTTOM NAV LABEL TO "SOCIAL FEED"
-          menu_path = 'app/src/main/res/menu/main_nav_menu.xml'
-          if os.path.exists(menu_path):
-              with open(menu_path, 'r', encoding='utf-8') as f:
-                  mcontent = f.read()
-              mcontent = re.sub(r'(<item\s+android:id="@+id/historyFragment".*?android:title=)"[^"]*"', r'\1"Social Feed"', mcontent)
-              with open(menu_path, 'w', encoding='utf-8') as f:
-                  f.write(mcontent)
-
-          # 7. AMOLED DARK HOME XML
-          home_xml_path = 'app/src/main/res/layout/fragment_home.xml'
-          with open(home_xml_path, 'w', encoding='utf-8') as f:
-              f.write('''<?xml version="1.0" encoding="utf-8"?>
+          cat << 'EOF' > app/src/main/res/layout/fragment_home.xml
+          <?xml version="1.0" encoding="utf-8"?>
           <androidx.coordinatorlayout.widget.CoordinatorLayout 
               xmlns:android="http://schemas.android.com/apk/res/android"
               xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -1334,980 +1278,147 @@ jobs:
                   </LinearLayout>
               </com.google.android.material.search.SearchView>
 
-          </androidx.coordinatorlayout.widget.CoordinatorLayout>''')
-
-          # 8. ERROR-FREE HOMEFRAGMENT.KT
-          home_kt_path = 'app/src/main/java/com/deniscerri/ytdl/ui/HomeFragment.kt'
-          with open(home_kt_path, 'w', encoding='utf-8') as f:
-              f.write('''package com.deniscerri.ytdl.ui
-
-          import android.annotation.SuppressLint
-          import android.app.Activity
-          import android.content.ClipboardManager
-          import android.content.Context
-          import android.content.Context.CLIPBOARD_SERVICE
-          import android.content.DialogInterface
-          import android.content.Intent
-          import android.content.SharedPreferences
-          import android.content.res.ColorStateList
-          import android.graphics.Color
-          import android.os.Bundle
-          import android.os.Handler
-          import android.os.Looper
-          import android.util.Patterns
-          import android.view.LayoutInflater
-          import android.view.Menu
-          import android.view.MenuItem
-          import android.view.MotionEvent
-          import android.view.View
-          import android.view.View.GONE
-          import android.view.View.OnClickListener
-          import android.view.View.OnTouchListener
-          import android.view.View.VISIBLE
-          import android.view.ViewGroup
-          import android.widget.EditText
-          import android.widget.HorizontalScrollView
-          import android.widget.ImageView
-          import android.widget.LinearLayout
-          import android.widget.Toast
-          import androidx.activity.addCallback
-          import androidx.activity.result.contract.ActivityResultContracts
-          import androidx.appcompat.app.AppCompatActivity
-          import androidx.appcompat.view.ActionMode
-          import androidx.constraintlayout.widget.ConstraintLayout
-          import androidx.core.os.bundleOf
-          import androidx.core.view.children
-          import androidx.core.view.forEach
-          import androidx.core.view.isVisible
-          import androidx.core.widget.doAfterTextChanged
-          import androidx.fragment.app.Fragment
-          import androidx.lifecycle.ViewModelProvider
-          import androidx.lifecycle.lifecycleScope
-          import androidx.navigation.fragment.findNavController
-          import androidx.preference.PreferenceManager
-          import androidx.recyclerview.widget.GridLayoutManager
-          import androidx.recyclerview.widget.LinearLayoutManager
-          import androidx.recyclerview.widget.RecyclerView
-          import com.deniscerri.ytdl.MainActivity
-          import com.deniscerri.ytdl.R
-          import com.deniscerri.ytdl.database.enums.DownloadType
-          import com.deniscerri.ytdl.database.models.ResultItem
-          import com.deniscerri.ytdl.database.models.SearchSuggestionItem
-          import com.deniscerri.ytdl.database.models.SearchSuggestionType
-          import com.deniscerri.ytdl.database.viewmodel.DownloadCardViewModel
-          import com.deniscerri.ytdl.database.viewmodel.DownloadViewModel
-          import com.deniscerri.ytdl.database.viewmodel.HistoryViewModel
-          import com.deniscerri.ytdl.database.viewmodel.ResultViewModel
-          import com.deniscerri.ytdl.ui.adapter.HomeAdapter
-          import com.deniscerri.ytdl.ui.adapter.SearchSuggestionsAdapter
-          import com.deniscerri.ytdl.ui.more.cookies.WebViewActivity
-          import com.deniscerri.ytdl.ui.quran.QuranActivity
-          import com.deniscerri.ytdl.util.Extensions.enableFastScroll
-          import com.deniscerri.ytdl.util.Extensions.isURL
-          import com.deniscerri.ytdl.util.NotificationUtil
-          import com.deniscerri.ytdl.util.UiUtil
-          import com.facebook.shimmer.ShimmerFrameLayout
-          import com.google.android.material.appbar.AppBarLayout
-          import com.google.android.material.appbar.MaterialToolbar
-          import com.google.android.material.button.MaterialButton
-          import com.google.android.material.chip.Chip
-          import com.google.android.material.chip.ChipGroup
-          import com.google.android.material.color.MaterialColors
-          import com.google.android.material.dialog.MaterialAlertDialogBuilder
-          import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-          import com.google.android.material.search.SearchBar
-          import com.google.android.material.search.SearchView
-          import kotlinx.coroutines.CoroutineScope
-          import kotlinx.coroutines.Dispatchers
-          import kotlinx.coroutines.delay
-          import kotlinx.coroutines.flow.collectLatest
-          import kotlinx.coroutines.flow.update
-          import kotlinx.coroutines.launch
-          import kotlinx.coroutines.withContext
-          import org.json.JSONArray
-          import java.net.URL
-
-          class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggestionsAdapter.OnItemClickListener, OnClickListener {
-              private var inputQueries: MutableList<String>? = null
-              private lateinit var homeAdapter: HomeAdapter
-              private var totalCount: Int = 0
-              private var firstResult: ResultItem? = null
-              private var searchSuggestionsAdapter: SearchSuggestionsAdapter? = null
-              private var queriesConstraint: ConstraintLayout? = null
-
-              private var downloadSelectedFab: ExtendedFloatingActionButton? = null
-              private var downloadAllFab: ExtendedFloatingActionButton? = null
-              private var clipboardFab: ExtendedFloatingActionButton? = null
-              private var homeFabs: LinearLayout? = null
-              private var notificationUtil: NotificationUtil? = null
-              private var downloadQueue: ArrayList<ResultItem>? = null
-
-              private lateinit var playlistNameFilterScrollView: HorizontalScrollView
-              private lateinit var playlistNameFilterChipGroup: ChipGroup
-
-              private lateinit var resultViewModel : ResultViewModel
-              private lateinit var downloadViewModel : DownloadViewModel
-              private lateinit var historyViewModel : HistoryViewModel
-              private lateinit var downloadCardViewModel : DownloadCardViewModel
-
-              private var fragmentView: View? = null
-              private var activity: Activity? = null
-              private var mainActivity: MainActivity? = null
-              private var fragmentContext: Context? = null
-              private var layoutinflater: LayoutInflater? = null
-              private var shimmerCards: ShimmerFrameLayout? = null
-              private var searchBar: SearchBar? = null
-              private var searchView: SearchView? = null
-              private var providersChipGroup: ChipGroup? = null
-              private var chipGroupDivider: View? = null
-              private var queriesChipGroup: ChipGroup? = null
-              private var recyclerView: RecyclerView? = null
-              private var searchSuggestionsRecyclerView: RecyclerView? = null
-              private var uiHandler: Handler? = null
-              private var quickLaunchSheet = false
-              private var sharedPreferences: SharedPreferences? = null
-              private var actionMode: ActionMode? = null
-              private var appBarLayout: AppBarLayout? = null
-              private var materialToolbar: MaterialToolbar? = null
-              private var loadingItems: Boolean = false
-              private var queryList = mutableListOf<String>()
-
-              private var showDownloadAllFab: Boolean = false
-              private var showClipboardFab: Boolean = false
-
-              override fun onCreateView(
-                  inflater: LayoutInflater, container: ViewGroup?,
-                  savedInstanceState: Bundle?
-              ): View? {
-                  fragmentView = inflater.inflate(R.layout.fragment_home, container, false)
-                  activity = getActivity()
-                  mainActivity = activity as? MainActivity
-                  quickLaunchSheet = false
-                  notificationUtil = NotificationUtil(requireContext())
-                  return fragmentView
-              }
-
-              override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-                  super.onViewCreated(view, savedInstanceState)
-
-                  fragmentContext = context
-                  layoutinflater = LayoutInflater.from(context)
-                  uiHandler = Handler(Looper.getMainLooper())
-
-                  downloadViewModel = ViewModelProvider(requireActivity())[DownloadViewModel::class.java]
-                  historyViewModel = ViewModelProvider(this)[HistoryViewModel::class.java]
-                  downloadCardViewModel = ViewModelProvider(requireActivity())[DownloadCardViewModel::class.java]
-                  resultViewModel = ViewModelProvider(requireActivity())[ResultViewModel::class.java]
-
-                  downloadQueue = ArrayList()
-                  sharedPreferences = PreferenceManager.getDefaultSharedPreferences(requireContext())
-
-                  searchBar = view.findViewById(R.id.search_bar)
-                  searchView = view.findViewById(R.id.search_view)
-                  appBarLayout = view.findViewById(R.id.home_appbarlayout)
-                  materialToolbar = view.findViewById(R.id.home_toolbar)
-                  queriesChipGroup = view.findViewById(R.id.queries)
-                  queriesConstraint = view.findViewById(R.id.queries_constraint)
-                  homeFabs = view.findViewById(R.id.home_fabs)
-                  downloadSelectedFab = homeFabs?.findViewById(R.id.download_selected_fab)
-                  downloadAllFab = homeFabs?.findViewById(R.id.download_all_fab)
-                  clipboardFab = homeFabs?.findViewById(R.id.copied_url_fab)
-                  playlistNameFilterScrollView = view.findViewById(R.id.playlist_selection_chips_scrollview)
-                  playlistNameFilterChipGroup = view.findViewById(R.id.playlist_selection_chips)
-                  shimmerCards = view.findViewById(R.id.shimmer_results_framelayout)
-
-                  view.findViewById<ImageView>(R.id.btn_settings)?.setOnClickListener { openSettingsScreen() }
-                  view.findViewById<ImageView>(R.id.btn_quick_search)?.setOnClickListener { searchBar?.performClick() }
-
-                  view.findViewById<View>(R.id.pill_quran)?.setOnClickListener {
-                      startActivity(Intent(requireContext(), QuranActivity::class.java))
-                  }
-
-                  view.findViewById<View>(R.id.pill_input_url)?.setOnClickListener { showDirectUrlInputDialog() }
-                  view.findViewById<View>(R.id.pill_history)?.setOnClickListener {
-                      loadIslamicHomeContent()
-                      Toast.makeText(context, "Refreshed Islamic Feed", Toast.LENGTH_SHORT).show()
-                  }
-
-                  homeAdapter = HomeAdapter(this, requireActivity())
-                  recyclerView = view.findViewById(R.id.recyclerViewHome)
-                  recyclerView?.layoutManager = GridLayoutManager(context, resources.getInteger(R.integer.grid_size))
-                  recyclerView?.adapter = homeAdapter
-                  recyclerView?.enableFastScroll()
-
-                  searchSuggestionsAdapter = SearchSuggestionsAdapter(this, requireActivity())
-                  searchSuggestionsRecyclerView = view.findViewById(R.id.search_suggestions_recycler)
-                  searchSuggestionsRecyclerView?.layoutManager = LinearLayoutManager(context)
-                  searchSuggestionsRecyclerView?.adapter = searchSuggestionsAdapter
-                  searchSuggestionsRecyclerView?.itemAnimator = null
-
-                  val progressBar = view.findViewById<View>(R.id.progress)
-
-                  lifecycleScope.launch {
-                      resultViewModel.paginatedItems.collectLatest { homeAdapter.submitData(it) }
-                  }
-
-                  homeAdapter.addLoadStateListener { loadStates ->
-                      val isNotLoading = loadStates.refresh is androidx.paging.LoadState.NotLoading
-                      if (isNotLoading) {
-                          val size = resultViewModel.totalCount.value
-                          val firstResult = resultViewModel.firstResult.value
-
-                          progressBar.isVisible = loadingItems && size > 0
-                          if (resultViewModel.repository.itemCount.value > 1 || resultViewModel.repository.itemCount.value == -1) {
-                              showDownloadAllFab = size > 1 && firstResult?.playlistTitle?.isNotEmpty() == true && !loadingItems
-                              downloadAllFab?.isVisible = showDownloadAllFab
-                          } else if (resultViewModel.repository.itemCount.value == 1) {
-                              if (sharedPreferences!!.getBoolean("download_card", true)) {
-                                  if (size == 1 && quickLaunchSheet && parentFragmentManager.findFragmentByTag("downloadSingleSheet") == null) {
-                                      showSingleDownloadSheet(
-                                          firstResult!!,
-                                          DownloadType.valueOf(sharedPreferences!!.getString("preferred_download_type", "video")!!)
-                                      )
-                                  }
-                              }
-                          } else {
-                              showDownloadAllFab = false
-                              downloadAllFab?.visibility = GONE
-                          }
-                          quickLaunchSheet = true
-                      }
-                  }
-
-                  lifecycleScope.launch { resultViewModel.totalCount.collectLatest { totalCount = it } }
-                  lifecycleScope.launch { resultViewModel.firstResult.collectLatest { firstResult = it } }
-                  lifecycleScope.launch {
-                      resultViewModel.playlistResults.collectLatest {
-                          updateMultiplePlaylistResults(it.filter { it2 -> it2 != "KUPIDO2_SEARCH" })
-                      }
-                  }
-
-                  initMenu()
-                  downloadSelectedFab?.tag = "downloadSelected"
-                  downloadSelectedFab?.setOnClickListener(this)
-                  downloadAllFab?.tag = "downloadAll"
-                  downloadAllFab?.setOnClickListener(this)
-
-                  if (arguments?.getString("url") != null) {
-                      val url = requireArguments().getString("url")
-                      if (inputQueries == null) inputQueries = mutableListOf()
-                      searchBar?.setText(url)
-                      val argList = url!!.lines().filter { it.isURL() }.toMutableList()
-                      inputQueries!!.addAll(argList)
-                  }
-
-                  if (inputQueries != null) {
-                      lifecycleScope.launch(Dispatchers.IO) {
-                          resultViewModel.deleteAll()
-                          resultViewModel.parseQueries(inputQueries!!) {}
-                          inputQueries = null
-                      }
-                  }
-
-                  searchView?.addTransitionListener { _, _, newState ->
-                      if (newState == SearchView.TransitionState.SHOWING) {
-                          mainActivity?.hideBottomNavigation()
-                      } else if (newState == SearchView.TransitionState.HIDING) {
-                          mainActivity?.showBottomNavigation()
-                      }
-                  }
-
-                  mainActivity?.onBackPressedDispatcher?.addCallback(this) {
-                      if (searchView?.isShowing == true) searchView?.hide()
-                      else mainActivity?.finishAffinity()
-                  }
-
-                  lifecycleScope.launch {
-                      resultViewModel.uiState.collectLatest { res ->
-                          if (res.errorMessage != null) {
-                              val isSingleQueryAndURL = queryList.size == 1 && Patterns.WEB_URL.matcher(queryList.first()).matches()
-                              kotlin.runCatching {
-                                  UiUtil.handleNoResults(requireActivity(), res.errorMessage!!,
-                                      url = if (isSingleQueryAndURL) queryList.first() else null,
-                                      continueAnyway = isSingleQueryAndURL,
-                                      continued = {
-                                          lifecycleScope.launch {
-                                              if (sharedPreferences!!.getBoolean("download_card", true)) {
-                                                  withContext(Dispatchers.Main) {
-                                                      showSingleDownloadSheet(
-                                                          resultItem = downloadViewModel.createEmptyResultItem(queryList.first()),
-                                                          type = DownloadType.valueOf(sharedPreferences!!.getString("preferred_download_type", "video")!!),
-                                                          disableUpdateData = true
-                                                      )
-                                                  }
-                                              } else {
-                                                  val downloadItem = downloadViewModel.createDownloadItemFromResult(
-                                                      result = downloadViewModel.createEmptyResultItem(queryList.first()),
-                                                      givenType = DownloadType.valueOf(sharedPreferences!!.getString("preferred_download_type", "video")!!)
-                                                  )
-                                                  downloadViewModel.queueDownloads(listOf(downloadItem))
-                                              }
-                                          }
-                                      },
-                                      cookieFetch = {
-                                          val myIntent = Intent(requireContext(), WebViewActivity::class.java)
-                                          myIntent.putExtra("url", "https://" + URL(queryList.first()).host)
-                                          cookiesFetchedResultLauncher.launch(myIntent)
-                                      },
-                                      closed = {}
-                                  )
-                              }
-                              resultViewModel.uiState.update { it.copy(errorMessage = null) }
-                          }
-
-                          loadingItems = res.processing
-                          progressBar.isVisible = loadingItems && totalCount > 0
-                          if (res.processing) {
-                              recyclerView?.setPadding(0, 0, 0, 0)
-                              shimmerCards?.startShimmer()
-                              shimmerCards?.visibility = VISIBLE
-                          } else {
-                              recyclerView?.setPadding(0, 0, 0, 100)
-                              shimmerCards?.stopShimmer()
-                              shimmerCards?.visibility = GONE
-                              showDownloadAllFab = totalCount > 1 && firstResult?.playlistTitle?.isNotEmpty() == true
-                              downloadAllFab?.isVisible = showDownloadAllFab
-                          }
-                      }
-                  }
-
-                  lifecycleScope.launch {
-                      downloadViewModel.alreadyExistsUiState.collectLatest { res ->
-                          if (res.isNotEmpty()) {
-                              withContext(Dispatchers.Main) {
-                                  val bundle = bundleOf(Pair("duplicates", ArrayList(res)))
-                                  delay(500)
-                                  findNavController().navigate(R.id.downloadsAlreadyExistDialog, bundle)
-                              }
-                              downloadViewModel.alreadyExistsUiState.value = mutableListOf()
-                          }
-                      }
-                  }
-              }
-
-              fun scrollToTop() {
-                  recyclerView?.scrollToPosition(0)
-                  runCatching { appBarLayout?.setExpanded(true, true) }
-              }
-
-              private fun openSettingsScreen() {
-                  try {
-                      findNavController().navigate(R.id.moreFragment)
-                  } catch (e: Exception) {
-                      requireActivity().findViewById<View>(R.id.moreFragment)?.performClick()
-                  }
-              }
-
-              private fun showDirectUrlInputDialog() {
-                  val input = EditText(requireContext()).apply {
-                      hint = "https://..."
-                      setPadding(40, 30, 40, 30)
-                      checkClipboard()?.firstOrNull()?.let { setText(it) }
-                  }
-
-                  MaterialAlertDialogBuilder(requireContext())
-                      .setTitle("Enter Media URL")
-                      .setView(input)
-                      .setPositiveButton("Download") { _, _ ->
-                          val enteredUrl = input.text.toString().trim()
-                          if (enteredUrl.isNotEmpty()) {
-                              searchBar?.setText(enteredUrl)
-                              queryList = mutableListOf(enteredUrl)
-                              startSearch()
-                          }
-                      }
-                      .setNegativeButton("Cancel", null)
-                      .show()
-              }
-
-              private fun loadIslamicHomeContent() {
-                  lifecycleScope.launch(Dispatchers.IO) {
-                      try {
-                          val jsonUrl = "https://raw.githubusercontent.com/Bindassrkks/K2app/main/data.json"
-                          val text = URL(jsonUrl).readText()
-                          val jsonArray = JSONArray(text)
-                          val urls = mutableListOf<String>()
-                          for (i in 0 until jsonArray.length()) {
-                              val obj = jsonArray.getJSONObject(i)
-                              val url = obj.optString("url")
-                              if (url.isNotEmpty()) urls.add(url)
-                          }
-
-                          if (urls.isNotEmpty()) {
-                              withContext(Dispatchers.Main) {
-                                  resultViewModel.deleteAll()
-                                  resultViewModel.parseQueries(urls) {}
-                              }
-                          } else {
-                              withContext(Dispatchers.Main) { resultViewModel.checkTrending() }
-                          }
-                      } catch (e: Exception) {
-                          withContext(Dispatchers.Main) { resultViewModel.checkTrending() }
-                      }
-                  }
-              }
-
-              private var cookiesFetchedResultLauncher = registerForActivityResult(
-                  ActivityResultContracts.StartActivityForResult()
-              ) { result ->
-                  if (result.resultCode == Activity.RESULT_OK) {
-                      sharedPreferences?.edit()?.putBoolean("use_cookies", true)?.apply()
-                      startSearch()
-                  }
-              }
-
-              override fun onResume() {
-                  super.onResume()
-                  if (arguments?.getString("url") == null) {
-                      if (!resultViewModel.uiState.value.processing) {
-                          loadIslamicHomeContent()
-                      }
-                  } else {
-                      arguments?.remove("url")
-                  }
-
-                  if (arguments?.getBoolean("showDownloadsWithUpdatedFormats") == true) {
-                      notificationUtil?.cancelDownloadNotification(NotificationUtil.FORMAT_UPDATING_FINISHED_NOTIFICATION_ID)
-                      arguments?.remove("showDownloadsWithUpdatedFormats")
-                      CoroutineScope(Dispatchers.IO).launch {
-                          val ids = arguments?.getLongArray("downloadIds") ?: return@launch
-                          downloadViewModel.turnDownloadItemsToProcessingDownloads(ids.toList(), deleteExisting = true)
-                          withContext(Dispatchers.Main) {
-                              findNavController().navigate(R.id.downloadMultipleBottomSheetDialog2)
-                          }
-                      }
-                  }
-
-                  if (arguments?.getBoolean("search") == true) {
-                      arguments?.remove("search")
-                      requireView().post { searchBar?.performClick() }
-                  }
-
-                  if (searchView?.currentTransitionState == SearchView.TransitionState.SHOWN) {
-                      updateSearchViewItems(searchView?.editText?.text.toString())
-                  }
-
-                  requireView().post {
-                      checkClipboard().apply {
-                          this?.apply {
-                              showClipboardFab = this.isNotEmpty()
-                              clipboardFab?.isVisible = showClipboardFab
-                              clipboardFab?.setOnClickListener {
-                                  if (this.size == 1) {
-                                      searchView?.setText(this.first())
-                                      showClipboardFab = false
-                                      clipboardFab?.isVisible = false
-                                      initSearch(searchView!!)
-                                  } else {
-                                      searchBar?.performClick()
-                                      lifecycleScope.launch {
-                                          withContext(Dispatchers.IO) { delay(500) }
-                                          this@apply.forEach { onSearchSuggestionAdd(it) }
-                                      }
-                                  }
-                              }
-                          }
-
-                          lifecycleScope.launch {
-                              clipboardFab?.extend()
-                              delay(1000)
-                              clipboardFab?.shrink()
-                          }
-                      }
-                  }
-              }
-
-              @SuppressLint("ClickableViewAccessibility")
-              private fun initMenu() {
-                  val queriesConstraint = requireView().findViewById<ConstraintLayout>(R.id.queries_constraint)
-                  val queriesInitStartBtn = queriesConstraint.findViewById<MaterialButton>(R.id.init_search_query)
-                  val isRightToLeft = resources.getBoolean(R.bool.is_right_to_left)
-
-                  providersChipGroup = searchView!!.findViewById(R.id.providers)
-                  val providers = resources.getStringArray(R.array.search_engines)
-                  val providersValues = resources.getStringArray(R.array.search_engines_values).toMutableList()
-
-                  for (i in providersValues.indices) {
-                      val provider = providers[i]
-                      val providerValue = providersValues[i]
-                      val tmp = layoutinflater!!.inflate(R.layout.filter_chip, providersChipGroup, false) as Chip
-                      tmp.text = provider
-                      tmp.id = i
-                      tmp.tag = providersValues[i]
-
-                      tmp.setOnClickListener {
-                          sharedPreferences?.edit()?.putString("search_engine", providerValue)?.apply()
-                      }
-                      providersChipGroup?.addView(tmp)
-                  }
-
-                  chipGroupDivider = requireView().findViewById(R.id.chipGroupDivider)
-
-                  searchView!!.addTransitionListener { _, _, newState ->
-                      if (newState == SearchView.TransitionState.SHOWN) {
-                          val currentProvider = sharedPreferences?.getString("search_engine", "ytsearch")
-                          providersChipGroup?.children?.forEach {
-                              val tmp = providersChipGroup?.findViewById<Chip>(it.id)
-                              if (tmp?.tag?.equals(currentProvider) == true) {
-                                  tmp.isChecked = true
-                                  return@forEach
-                              }
-                          }
-
-                          if (Patterns.WEB_URL.matcher(searchBar!!.text.toString()).matches() && searchBar!!.text.isNotBlank()) {
-                              providersChipGroup?.visibility = GONE
-                              chipGroupDivider?.visibility = GONE
-                          } else {
-                              providersChipGroup?.visibility = VISIBLE
-                              chipGroupDivider?.visibility = VISIBLE
-                          }
-                          updateSearchViewItems(searchView!!.editText.text.toString())
-                      }
-                  }
-
-                  searchView!!.editText.doAfterTextChanged {
-                      if (searchView!!.currentTransitionState != SearchView.TransitionState.SHOWN) return@doAfterTextChanged
-                      updateSearchViewItems(it.toString())
-                  }
-
-                  searchView!!.editText.setOnTouchListener(OnTouchListener { _, event ->
-                      try {
-                          val drawableLeft = 0
-                          val drawableRight = 2
-                          if (event.action == MotionEvent.ACTION_UP) {
-                              if ((isRightToLeft && (event.x < (searchView!!.editText.left - searchView!!.editText.compoundDrawables[drawableLeft].bounds.width()))) ||
-                                  (!isRightToLeft && (event.x > (searchView!!.editText.right - searchView!!.editText.compoundDrawables[drawableRight].bounds.width())))) {
-
-                                  val present = queriesChipGroup!!.children.firstOrNull { (it as Chip).text.toString() == searchView!!.editText.text.toString() }
-                                  if (present == null) {
-                                      val chip = layoutinflater!!.inflate(R.layout.input_chip, queriesChipGroup, false) as Chip
-                                      chip.text = searchView!!.editText.text
-                                      chip.chipBackgroundColor = ColorStateList.valueOf(MaterialColors.getColor(requireContext(), R.attr.colorSecondaryContainer, Color.BLACK))
-                                      chip.setOnClickListener {
-                                          queriesChipGroup!!.removeView(chip)
-                                          if (queriesChipGroup!!.childCount == 0) queriesConstraint.visibility = GONE
-                                      }
-                                      queriesChipGroup!!.addView(chip)
-                                  }
-                                  if (queriesChipGroup!!.childCount == 0) queriesConstraint.visibility = GONE
-                                  else queriesConstraint.visibility = VISIBLE
-                                  searchView!!.editText.setText("")
-                                  return@OnTouchListener true
-                              }
-                          }
-                      } catch (ignored: Exception) {}
-                      false
-                  })
-
-                  searchView!!.editText.setOnEditorActionListener { _, _, _ ->
-                      initSearch(searchView!!)
-                      true
-                  }
-
-                  searchBar!!.setOnMenuItemClickListener { m: MenuItem ->
-                      when (m.itemId) {
-                          R.id.delete_results -> {
-                              lifecycleScope.launch {
-                                  withContext(Dispatchers.IO) { resultViewModel.cancelParsingQueries() }
-                              }
-                              resultViewModel.getHomeRecommendations()
-                              searchBar!!.setText("")
-                              showDownloadAllFab = false
-                              downloadAllFab!!.visibility = GONE
-                              downloadSelectedFab!!.visibility = GONE
-                          }
-                          R.id.delete_search -> {
-                              resultViewModel.deleteAllSearchQueryHistory()
-                              searchSuggestionsAdapter?.submitList(listOf())
-                          }
-                      }
-                      true
-                  }
-                  queriesChipGroup!!.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-                      if (queriesChipGroup!!.childCount == 0) queriesConstraint.visibility = GONE
-                      else queriesConstraint.visibility = VISIBLE
-                  }
-
-                  queriesInitStartBtn.setOnClickListener { initSearch(searchView!!) }
-              }
-
-              @SuppressLint("InflateParams")
-              private fun updateSearchViewItems(searchQuery: String) = lifecycleScope.launch(Dispatchers.Main) {
-                  if (searchView!!.editText.text.isEmpty()) {
-                      searchView!!.editText.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
-                  } else {
-                      searchView!!.editText.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_link, 0)
-                  }
-
-                  val combinedList = mutableListOf<SearchSuggestionItem>()
-
-                  val history = withContext(Dispatchers.IO) {
-                      resultViewModel.getSearchHistory().map { it.query }.filter { it.contains(searchQuery, ignoreCase = true) }
-                  }.map { SearchSuggestionItem(it, SearchSuggestionType.HISTORY) }
-
-                  val suggestions = if (sharedPreferences!!.getBoolean("search_suggestions", false)) {
-                      withContext(Dispatchers.IO) { resultViewModel.getSearchSuggestions(searchQuery) }
-                  } else {
-                      emptyList()
-                  }.map { SearchSuggestionItem(it, SearchSuggestionType.SUGGESTION) }
-
-                  combinedList.addAll(history)
-                  combinedList.addAll(suggestions)
-
-                  val url = checkClipboard()
-                  url?.apply {
-                      val alreadyHasThem = this.all { queriesChipGroup?.children?.any { c -> (c as Chip).text.contains(it) } == true }
-                      if (this.isNotEmpty() && !alreadyHasThem) {
-                          combinedList.add(0, SearchSuggestionItem(this.joinToString("\n"), SearchSuggestionType.CLIPBOARD))
-                      }
-                  }
-
-                  searchSuggestionsAdapter?.submitList(combinedList)
-
-                  if (Patterns.WEB_URL.matcher(searchView!!.editText.text).matches()) {
-                      providersChipGroup?.visibility = GONE
-                      chipGroupDivider?.visibility = GONE
-                  } else {
-                      providersChipGroup?.visibility = VISIBLE
-                      chipGroupDivider?.visibility = VISIBLE
-                  }
-              }
-
-              private fun initSearch(searchView: SearchView) {
-                  queryList = mutableListOf()
-                  if (queriesChipGroup!!.childCount > 0) {
-                      queriesChipGroup!!.children.forEach {
-                          val query = (it as Chip).text.toString().trim { it2 -> it2 <= ' ' }
-                          if (query.isNotEmpty()) queryList.add(query)
-                      }
-                      queriesChipGroup!!.removeAllViews()
-                  }
-                  if (searchView.editText.text.isNotBlank()) {
-                      queryList.add(searchView.editText.text.toString())
-                  }
-
-                  if (queryList.isEmpty()) return
-                  if (queryList.size == 1) {
-                      searchBar!!.setText(searchView.text)
-                  }
-
-                  searchView.hide()
-                  if (!sharedPreferences!!.getBoolean("incognito", false)) {
-                      queryList.forEach { q -> resultViewModel.addSearchQueryToHistory(q) }
-                  }
-                  startSearch()
-              }
-
-              private fun startSearch() {
-                  lifecycleScope.launch(Dispatchers.IO) {
-                      resultViewModel.deleteAll()
-                      if (sharedPreferences!!.getBoolean("quick_download", false) || sharedPreferences!!.getString("preferred_download_type", "video") == "command") {
-                          if (queryList.size == 1 && Patterns.WEB_URL.matcher(queryList.first()).matches()) {
-                              if (sharedPreferences!!.getBoolean("download_card", true)) {
-                                  withContext(Dispatchers.Main) {
-                                      showSingleDownloadSheet(
-                                          resultItem = downloadViewModel.createEmptyResultItem(queryList.first()),
-                                          type = DownloadType.valueOf(sharedPreferences!!.getString("preferred_download_type", "video")!!)
-                                      )
-                                  }
-                              } else {
-                                  val downloadItem = downloadViewModel.createDownloadItemFromResult(
-                                      result = downloadViewModel.createEmptyResultItem(queryList.first()),
-                                      givenType = DownloadType.valueOf(sharedPreferences!!.getString("preferred_download_type", "video")!!)
-                                  )
-                                  downloadViewModel.queueDownloads(listOf(downloadItem))
-                              }
-                          } else {
-                              resultViewModel.parseQueries(queryList) {}
-                          }
-                      } else {
-                          resultViewModel.parseQueries(queryList) {}
-                      }
-                  }
-              }
-
-              @SuppressLint("ResourceType")
-              override fun onButtonClick(item: ResultItem, type: DownloadType?) {
-                  if (sharedPreferences!!.getBoolean("download_card", true)) {
-                      showSingleDownloadSheet(item, type!!)
-                  } else {
-                      lifecycleScope.launch {
-                          val downloadItem = withContext(Dispatchers.IO) {
-                              downloadViewModel.createDownloadItemFromResult(result = item, givenType = type!!)
-                          }
-                          downloadViewModel.queueDownloads(listOf(downloadItem))
-                      }
-                  }
-              }
-
-              override fun onLongButtonClick(item: ResultItem, type: DownloadType?) {
-                  showSingleDownloadSheet(item, type!!)
-              }
-
-              @SuppressLint("RestrictedApi")
-              private fun showSingleDownloadSheet(
-                  resultItem: ResultItem,
-                  type: DownloadType,
-                  disableUpdateData: Boolean = false
-              ) {
-                  if (findNavController().currentBackStack.value.firstOrNull { it.destination.id == R.id.downloadBottomSheetDialog } == null &&
-                      findNavController().currentDestination?.id == R.id.homeFragment) {
-                      val bundle = Bundle()
-                      downloadCardViewModel.setResultItem(resultItem)
-                      downloadCardViewModel.setDownloadItem(null)
-                      bundle.putSerializable("type", downloadViewModel.getDownloadType(type, resultItem.url))
-                      if (disableUpdateData) bundle.putBoolean("disableUpdateData", true)
-                      findNavController().navigate(R.id.downloadBottomSheetDialog, bundle)
-                  }
-              }
-
-              override fun onCardClick(item: ResultItem, add: Boolean) {
-                  lifecycleScope.launch {
-                      val selectedObjects = homeAdapter.getSelectedObjectsCount(totalCount)
-                      if (actionMode == null) actionMode = (activity as? AppCompatActivity)?.startSupportActionMode(contextualActionBar)
-                      actionMode?.apply {
-                          if (selectedObjects == 0) {
-                              this.finish()
-                          } else {
-                              actionMode?.title = "$selectedObjects ${getString(R.string.selected)}"
-                              this.menu.findItem(R.id.select_between).isVisible = false
-                              if (selectedObjects == 2) {
-                                  val selectedIDs = contextualActionBar.getSelectedIDs().sortedBy { it }
-                                  val resultsInMiddle = withContext(Dispatchers.IO) {
-                                      resultViewModel.getResultsBetweenTwoItems(selectedIDs.first(), selectedIDs.last())
-                                  }.toMutableList()
-                                  this.menu.findItem(R.id.select_between).isVisible = resultsInMiddle.isNotEmpty()
-                              }
-                          }
-                      }
-                  }
-              }
-
-              override fun onCardDetailsClick(item: ResultItem) {
-                  if (parentFragmentManager.findFragmentByTag("resultDetails") == null) {
-                      val bundle = Bundle()
-                      bundle.putParcelable("result", item)
-                      findNavController().navigate(R.id.resultCardDetailsDialog, bundle)
-                  }
-              }
-
-              override fun onClick(v: View) {
-                  val viewIdName: String = try { v.tag.toString() } catch (e: Exception) { "" }
-                  if (viewIdName.isNotEmpty()) {
-                      if (viewIdName == "downloadAll") {
-                          val showDownloadCard = sharedPreferences!!.getBoolean("download_card", true)
-                          lifecycleScope.launch {
-                              val resultIds = withContext(Dispatchers.IO) { resultViewModel.getAllIds() }
-                              downloadViewModel.turnResultItemsToProcessingDownloads(resultIds, downloadNow = !showDownloadCard)
-                              if (showDownloadCard) findNavController().navigate(R.id.downloadMultipleBottomSheetDialog2)
-                          }
-                      }
-                  }
-              }
-
-              private val contextualActionBar = object : ActionMode.Callback {
-                  override fun onCreateActionMode(mode: ActionMode?, menu: Menu?): Boolean {
-                      mode!!.menuInflater.inflate(R.menu.main_menu_context, menu)
-                      mode.title = "${homeAdapter.getSelectedObjectsCount(totalCount)} ${getString(R.string.selected)}"
-                      searchBar?.isEnabled = false
-                      playlistNameFilterChipGroup.children.forEach { it.isEnabled = false }
-                      searchBar?.menu?.forEach { it.isEnabled = false }
-                      (activity as? MainActivity)?.disableBottomNavigation()
-                      downloadAllFab?.isVisible = false
-                      clipboardFab?.isVisible = false
-                      return true
-                  }
-
-                  override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?): Boolean = false
-
-                  override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
-                      return when (item!!.itemId) {
-                          R.id.select_between -> {
-                              lifecycleScope.launch {
-                                  val selectedIDs = getSelectedIDs().toMutableList()
-                                  val resultsInMiddle = withContext(Dispatchers.IO) {
-                                      resultViewModel.getResultsBetweenTwoItems(selectedIDs.first(), selectedIDs.last())
-                                  }.toMutableList()
-                                  if (resultsInMiddle.isNotEmpty()) {
-                                      selectedIDs.addAll(resultsInMiddle.map { it.id })
-                                      homeAdapter.checkMultipleItems(selectedIDs)
-                                      actionMode?.title = "${selectedIDs.count()} ${getString(R.string.selected)}"
-                                  }
-                                  mode?.menu?.findItem(R.id.select_between)?.isVisible = false
-                              }
-                              true
-                          }
-                          R.id.delete_results -> {
-                              val deleteDialog = MaterialAlertDialogBuilder(fragmentContext!!)
-                              deleteDialog.setTitle(getString(R.string.you_are_going_to_delete_multiple_items))
-                              deleteDialog.setNegativeButton(getString(R.string.cancel)) { dialogInterface: DialogInterface, _: Int -> dialogInterface.cancel() }
-                              deleteDialog.setPositiveButton(getString(R.string.ok)) { _: DialogInterface?, _: Int ->
-                                  lifecycleScope.launch {
-                                      val selectedObjects = getSelectedIDs()
-                                      if (selectedObjects.size == totalCount) resultViewModel.deleteAll()
-                                      else resultViewModel.deleteSelected(selectedObjects)
-                                      homeAdapter.clearCheckedItems()
-                                      actionMode?.finish()
-                                  }
-                              }
-                              deleteDialog.show()
-                              true
-                          }
-                          R.id.download -> {
-                              lifecycleScope.launch {
-                                  val showDownloadCard = sharedPreferences!!.getBoolean("download_card", true)
-                                  val selectedObjects = getSelectedIDs()
-                                  if (showDownloadCard && selectedObjects.size == 1) {
-                                      val resultItem = withContext(Dispatchers.IO) { resultViewModel.getByID(selectedObjects.first()) }
-                                      resultItem?.apply {
-                                          showSingleDownloadSheet(resultItem, downloadViewModel.getDownloadType(DownloadType.video, resultItem.url))
-                                      }
-                                  } else {
-                                      downloadViewModel.turnResultItemsToProcessingDownloads(selectedObjects, downloadNow = !showDownloadCard)
-                                      if (showDownloadCard) findNavController().navigate(R.id.downloadMultipleBottomSheetDialog2)
-                                  }
-                                  homeAdapter.clearCheckedItems()
-                                  actionMode?.finish()
-                              }
-                              true
-                          }
-                          R.id.select_all -> {
-                              homeAdapter.checkAll()
-                              val selectedCount = homeAdapter.getSelectedObjectsCount(totalCount)
-                              mode?.title = "(${selectedCount}) ${resources.getString(R.string.all_items_selected)}"
-                              true
-                          }
-                          R.id.invert_selected -> {
-                              homeAdapter.invertSelected()
-                              val selectedCount = homeAdapter.getSelectedObjectsCount(totalCount)
-                              actionMode!!.title = "$selectedCount ${getString(R.string.selected)}"
-                              if (selectedCount == 0) actionMode?.finish()
-                              true
-                          }
-                          else -> false
-                      }
-                  }
-
-                  override fun onDestroyActionMode(mode: ActionMode?) {
-                      actionMode = null
-                      (activity as? MainActivity)?.enableBottomNavigation()
-                      homeAdapter.clearCheckedItems()
-                      searchBar?.isEnabled = true
-                      playlistNameFilterChipGroup.children.forEach { it.isEnabled = true }
-                      searchBar?.menu?.forEach { it.isEnabled = true }
-                      appBarLayout?.setExpanded(true, true)
-                      downloadAllFab?.isVisible = showDownloadAllFab
-                      clipboardFab?.isVisible = showClipboardFab
-                  }
-
-                  suspend fun getSelectedIDs(): List<Long> {
-                      return if (homeAdapter.inverted || homeAdapter.checkedItems.isEmpty()) {
-                          withContext(Dispatchers.IO) { resultViewModel.getItemIDsNotPresentIn(homeAdapter.checkedItems.toList()) }
-                      } else {
-                          homeAdapter.checkedItems.toList()
-                      }
-                  }
-              }
-
-              private fun checkClipboard(): List<String>? {
-                  return kotlin.runCatching {
-                      val clipboard = requireContext().getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                      val clip = clipboard.primaryClip?.getItemAt(0)?.text ?: return null
-                      clip.lines().map { it.trim() }.filter { Patterns.WEB_URL.matcher(it).matches() }
-                  }.getOrNull()
-              }
-
-              override fun onSearchSuggestionClick(text: String) {
-                  val res = text.lines()
-                  if (res.size == 1) {
-                      showClipboardFab = false
-                      clipboardFab?.isVisible = false
-                      searchView?.setText(text)
-                      initSearch(searchView!!)
-                  } else {
-                      res.forEach { onSearchSuggestionAdd(it) }
-                  }
-              }
-
-              override fun onSearchSuggestionAdd(text: String) {
-                  val items = text.lines()
-                  items.forEach { t ->
-                      val present = queriesChipGroup?.children?.firstOrNull { (it as Chip).text.toString() == t }
-                      if (present == null) {
-                          val chip = layoutinflater!!.inflate(R.layout.input_chip, queriesChipGroup, false) as Chip
-                          chip.text = t
-                          chip.chipBackgroundColor = ColorStateList.valueOf(MaterialColors.getColor(requireContext(), R.attr.colorSecondaryContainer, Color.BLACK))
-                          chip.setOnClickListener {
-                              if (queriesChipGroup?.childCount == 1) queriesConstraint?.visibility = View.GONE
-                              queriesChipGroup?.removeView(chip)
-                          }
-                          queriesChipGroup?.addView(chip)
-                      }
-                  }
-
-                  searchView?.editText?.setText("")
-                  queriesConstraint?.isVisible = (queriesChipGroup?.childCount ?: 0) > 0
-
-                  searchSuggestionsAdapter?.getList()?.apply {
-                      if (this.isNotEmpty() && this.first().type == SearchSuggestionType.CLIPBOARD) {
-                          val newList = this.toMutableList().drop(1)
-                          searchSuggestionsAdapter?.submitList(newList)
-                      }
-                  }
-              }
-
-              override fun onSearchSuggestionLongClick(text: String, position: Int) {
-                  val deleteDialog = MaterialAlertDialogBuilder(requireContext())
-                  deleteDialog.setTitle(getString(R.string.you_are_going_to_delete) + " " + text)
-                  deleteDialog.setNegativeButton(getString(R.string.cancel)) { dialogInterface: DialogInterface, _: Int -> dialogInterface.cancel() }
-                  deleteDialog.setPositiveButton(getString(R.string.ok)) { _: DialogInterface?, _: Int ->
-                      resultViewModel.removeSearchQueryFromHistory(text)
-                      updateSearchViewItems(searchView?.editText?.text.toString())
-                  }
-                  deleteDialog.show()
-              }
-
-              override fun onSearchSuggestionAddToSearchBar(text: String) {
-                  searchView?.editText?.setText(text)
-                  searchView?.editText?.let { it.setSelection(it.length()) }
-              }
-
-              private fun updateMultiplePlaylistResults(playlistTitles: List<String>) {
-                  playlistNameFilterChipGroup.children.filter { it.tag != "all" }.forEach {
-                      playlistNameFilterChipGroup.removeView(it)
-                  }
-
-                  if (playlistTitles.isEmpty() || playlistTitles.size == 1) {
-                      playlistNameFilterScrollView.isVisible = false
-                      return
-                  }
-
-                  playlistNameFilterChipGroup.children.first().setOnClickListener {
-                      resultViewModel.setPlaylistFilter("")
-                  }
-
-                  for (t in playlistTitles) {
-                      val tmp = layoutinflater!!.inflate(R.layout.filter_chip, playlistNameFilterChipGroup, false) as Chip
-                      tmp.text = t
-                      tmp.tag = t
-                      tmp.setOnClickListener { resultViewModel.setPlaylistFilter(t) }
-                      playlistNameFilterChipGroup.addView(tmp)
-                  }
-
-                  if (playlistNameFilterChipGroup.children.all { !(it as Chip).isChecked }) {
-                      (playlistNameFilterChipGroup.children.first() as Chip).isChecked = true
-                  }
-
-                  playlistNameFilterScrollView.isVisible = true
-              }
-          }
+          </androidx.coordinatorlayout.widget.CoordinatorLayout>
           EOF
+
+          # 5. PYTHON INJECTOR FOR MANIFEST, NAV MENU & FRAGMENTS
+          python3 - << 'PYEOF'
+          import os
+          import re
+
+          # Inject QuranActivity in AndroidManifest.xml
+          manifest_path = 'app/src/main/AndroidManifest.xml'
+          if os.path.exists(manifest_path):
+              with open(manifest_path, 'r', encoding='utf-8') as f:
+                  m_content = f.read()
+
+              if 'com.deniscerri.ytdl.ui.quran.QuranActivity' not in m_content:
+                  entry = '''        <activity
+                      android:name="com.deniscerri.ytdl.ui.quran.QuranActivity"
+                      android:exported="false" />
+              </application>'''
+                  m_content = m_content.replace('</application>', entry)
+                  with open(manifest_path, 'w', encoding='utf-8') as f:
+                      f.write(m_content)
+
+          # Add Quran entry to fragment_more.xml
+          more_xml_path = 'app/src/main/res/layout/fragment_more.xml'
+          if os.path.exists(more_xml_path):
+              with open(more_xml_path, 'r', encoding='utf-8') as f:
+                  mxml = f.read()
+
+              if 'android:id="@+id/quran_app"' not in mxml:
+                  quran_view = '''            <TextView
+                      android:id="@+id/quran_app"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:drawablePadding="35dp"
+                      android:textSize="16sp"
+                      android:paddingVertical="15dp"
+                      android:text="Al-Quran (القرآن الكريم)"
+                      android:textColor="#00E676"
+                      android:textStyle="bold"
+                      android:clickable="true"
+                      android:focusable="true"
+                      android:background="?android:attr/selectableItemBackground"
+                      android:paddingHorizontal="15dp"
+                      app:drawableStartCompat="@drawable/ic_quran" />
+          '''
+                  mxml = re.sub(r'(<TextView\s+android:id="@+id/settings".*?/>)', quran_view + r'\1', mxml, flags=re.DOTALL)
+                  with open(more_xml_path, 'w', encoding='utf-8') as f:
+                      f.write(mxml)
+
+          # Inject Quran click listener in MoreFragment.kt
+          more_kt_path = 'app/src/main/java/com/deniscerri/ytdl/ui/more/MoreFragment.kt'
+          if os.path.exists(more_kt_path):
+              with open(more_kt_path, 'r', encoding='utf-8') as f:
+                  mkt = f.read()
+
+              if 'com.deniscerri.ytdl.ui.quran.QuranActivity' not in mkt:
+                  mkt = "import com.deniscerri.ytdl.ui.quran.QuranActivity\n" + mkt
+                  quran_code = '''        view.findViewById<TextView>(R.id.quran_app)?.setOnClickListener {
+                      startActivity(android.content.Intent(requireContext(), QuranActivity::class.java))
+                  }
+          '''
+                  mkt = mkt.replace('settings = view.findViewById(R.id.settings)', quran_code + '\n        settings = view.findViewById(R.id.settings)')
+                  with open(more_kt_path, 'w', encoding='utf-8') as f:
+                      f.write(mkt)
+
+          # Update bottom nav title to Social Feed
+          menu_path = 'app/src/main/res/menu/main_nav_menu.xml'
+          if os.path.exists(menu_path):
+              with open(menu_path, 'r', encoding='utf-8') as f:
+                  mcontent = f.read()
+              mcontent = re.sub(r'(<item\s+android:id="@+id/historyFragment".*?android:title=)"[^"]*"', r'\1"Social Feed"', mcontent)
+              with open(menu_path, 'w', encoding='utf-8') as f:
+                  f.write(mcontent)
+
+          print("Python injector finished successfully!")
+          PYEOF
+
+          # 6. INJECT BUTTON ACTIONS INTO HOMEFRAGMENT
+          python3 - << 'PYEOF'
+          import os
+
+          home_kt = 'app/src/main/java/com/deniscerri/ytdl/ui/HomeFragment.kt'
+          if os.path.exists(home_kt):
+              with open(home_kt, 'r', encoding='utf-8') as f:
+                  code = f.read()
+
+              if 'loadIslamicHomeContent' not in code:
+                  import_header = "import com.deniscerri.ytdl.ui.quran.QuranActivity\nimport org.json.JSONArray\n"
+                  code = import_header + code
+
+                  hook_injection = '''
+                          view.findViewById<View>(R.id.pill_quran)?.setOnClickListener {
+                              startActivity(android.content.Intent(requireContext(), QuranActivity::class.java))
+                          }
+                          view.findViewById<View>(R.id.pill_history)?.setOnClickListener {
+                              loadIslamicHomeContent()
+                          }
+                  '''
+                  code = code.replace('super.onViewCreated(view, savedInstanceState)', 'super.onViewCreated(view, savedInstanceState)\n' + hook_injection)
+
+                  helper_func = '''
+                      private fun loadIslamicHomeContent() {
+                          lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                              try {
+                                  val text = java.net.URL("https://raw.githubusercontent.com/Bindassrkks/K2app/main/data.json").readText()
+                                  val jsonArray = org.json.JSONArray(text)
+                                  val urls = mutableListOf<String>()
+                                  for (i in 0 until jsonArray.length()) {
+                                      val u = jsonArray.getJSONObject(i).optString("url")
+                                      if (u.isNotEmpty()) urls.add(u)
+                                  }
+                                  if (urls.isNotEmpty()) {
+                                      kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                          resultViewModel.deleteAll()
+                                          resultViewModel.parseQueries(urls) {}
+                                      }
+                                  }
+                              } catch (e: Exception) {
+                                  e.printStackTrace()
+                              }
+                          }
+                      }
+                  '''
+                  last_brace = code.rfind('}')
+                  if last_brace != -1:
+                      code = code[:last_brace] + helper_func + '\n}'
+                  with open(home_kt, 'w', encoding='utf-8') as f:
+                      f.write(code)
+
+          print("HomeFragment patched without overriding source!")
+          PYEOF
 
       - name: Build Android APK
         run: |
           chmod +x gradlew
           BUILD_TASK="${{ inputs.build_type || 'assembleRelease' }}"
-          ./gradlew ":${{ env.main_project_module }}:${BUILD_TASK}" --stacktrace --warning-mode none
+          ./gradlew ":${{ env.main_project_module }}:${BUILD_TASK}" \
+            -Dorg.gradle.jvmargs="-Xmx4096m -XX:+UseParallelGC" \
+            -Pandroid.native.buildOutput=verbose \
+            --stacktrace --warning-mode none
 
       - name: Commit & Push Patched Code to Repository
         if: success()
