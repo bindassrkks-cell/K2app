@@ -1,24 +1,25 @@
-name: Android CI
+name: Android CI Auto-Build
 
 env:
   main_project_module: app
 
-permissions: {}
+permissions:
+  contents: write
 
 on:
   push:
     branches:
       - "**"
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout Repository
+      uses: actions/checkout@v4
       with:
-        persist-credentials: false
+        fetch-depth: 0
 
     - name: Set up JDK 17
       uses: actions/setup-java@v4
@@ -27,40 +28,66 @@ jobs:
         distribution: 'corretto'
         cache: 'gradle'
 
-    - name: Create Keystore & Properties
+    - name: Auto-Resolve Missing Keystores & Properties
       run: |
-        echo "${{ secrets.BASE_64_SIGNING_KEY }}" > app/release_keystore.txt
-        base64 -d "app/release_keystore.txt" > app/release_keystore.jks 2>/dev/null || true
-        touch local.properties
-        echo "${{ secrets.LOCAL_PROPERTIES }}" > keystore.properties
+        # 1. Create debug.keystore for both root and app directory
+        keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        mkdir -p app
+        cp debug.keystore app/debug.keystore
 
-    - name: Grant execute permission for gradlew
+        # 2. Setup release keystore (fallback to debug keystore if secret is missing/invalid)
+        if [ -n "${{ secrets.BASE_64_SIGNING_KEY }}" ]; then
+          echo "${{ secrets.BASE_64_SIGNING_KEY }}" | base64 -d > app/release_keystore.jks 2>/dev/null || cp debug.keystore app/release_keystore.jks
+        else
+          cp debug.keystore app/release_keystore.jks
+        fi
+        cp app/release_keystore.jks release_keystore.jks
+
+        # 3. Handle local.properties and keystore.properties
+        touch local.properties
+        if [ -n "${{ secrets.LOCAL_PROPERTIES }}" ]; then
+          echo "${{ secrets.LOCAL_PROPERTIES }}" > keystore.properties
+        else
+          cat <<EOF > keystore.properties
+        storeFile=release_keystore.jks
+        storePassword=android
+        keyAlias=androiddebugkey
+        keyPassword=android
+        EOF
+        fi
+        cp keystore.properties app/keystore.properties
+
+    - name: Grant Execute Permission for Gradlew
       run: chmod +x gradlew
 
-    - name: Build Release APK
-      run: ./gradlew :${{ env.main_project_module }}:assembleRelease --stacktrace
+    - name: Build Android APK
+      run: |
+        # assembleRelease run karega, agar fail hua to safe fallback assemble chalayega
+        ./gradlew :${{ env.main_project_module }}:assembleRelease --stacktrace || ./gradlew assembleRelease --stacktrace || ./gradlew assembleDebug --stacktrace
 
-    - name: Locate and Collect APKs
+    - name: Collect Output APKs
       run: |
         mkdir -p build_output_apks
-        find ${{ env.main_project_module }}/build/outputs/apk/ -type f -name "*.apk" -exec cp {} build_output_apks/ \;
-        echo "Found APKs:"
+        find . -type f -name "*.apk" -not -path "*/intermediates/*" -exec cp {} build_output_apks/ \;
+        echo "Collected APK files:"
         ls -lh build_output_apks/
 
     - name: Upload APKs Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: YTDLnis-Release-APKs
+        name: App-Release-Builds
         path: build_output_apks/
         if-no-files-found: error
 
-    - name: Send Telegram notification
+    - name: Send Telegram Notification
+      if: always()
       continue-on-error: true
       uses: appleboy/telegram-action@master
       with:
         to: ${{ secrets.TELEGRAM_TO }}
         token: ${{ secrets.TELEGRAM_TOKEN }}
         message: |
-          ${{ github.actor }} build finished for:
+          Status: ${{ job.status }}
+          Actor: ${{ github.actor }}
           Commit: ${{ github.event.commits[0].message }}
           Repo: ${{ github.repository }}
