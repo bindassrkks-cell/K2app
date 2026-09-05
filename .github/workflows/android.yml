@@ -48,21 +48,29 @@ jobs:
         if [ -n "${{ secrets.LOCAL_PROPERTIES }}" ]; then
           echo "${{ secrets.LOCAL_PROPERTIES }}" > keystore.properties
         else
-          cat <<EOF > keystore.properties
-        storeFile=release_keystore.jks
-        storePassword=android
-        keyAlias=androiddebugkey
-        keyPassword=android
-        EOF
+          cat << 'EOF' > keystore.properties
+storeFile=release_keystore.jks
+storePassword=android
+keyAlias=androiddebugkey
+keyPassword=android
+EOF
         fi
         cp keystore.properties app/keystore.properties
+
+    # Missing drawables aur naye UI ko auto-inject karega
+    - name: Run UI Fix Script
+      run: |
+        if [ -f fix_ui.py ]; then
+          python3 fix_ui.py
+        else
+          echo "fix_ui.py not found in root directory!"
+        fi
 
     - name: Grant Execute Permission for Gradlew
       run: chmod +x gradlew
 
     - name: Build Android APK
       run: |
-        # assembleRelease run karega, agar fail hua to safe fallback assemble chalayega
         ./gradlew :${{ env.main_project_module }}:assembleRelease --stacktrace || ./gradlew assembleRelease --stacktrace || ./gradlew assembleDebug --stacktrace
 
     - name: Collect Output APKs
