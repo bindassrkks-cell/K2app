@@ -1,4 +1,6 @@
 package com.deniscerri.ytdl.ui.more
+import com.deniscerri.ytdl.ui.quran.QuranActivity
+import android.widget.TextView
 
 import android.content.Intent
 import android.content.SharedPreferences
@@ -68,6 +70,11 @@ class MoreFragment : Fragment() {
                         cookies = view.findViewById(R.id.cookies)
         observeSources = view.findViewById(R.id.observe_sources)
         terminateApp = view.findViewById(R.id.terminate)
+        
+        view.findViewById<android.widget.TextView>(R.id.quran_app)?.setOnClickListener {
+            startActivity(android.content.Intent(requireContext(), QuranActivity::class.java))
+        }
+        
         settings = view.findViewById(R.id.settings)
         aboutApp = view.findViewById(R.id.about_app)
         developerMode = view.findViewById(R.id.developer_mode)

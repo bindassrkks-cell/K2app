@@ -600,6 +600,7 @@
                 android:resource="@xml/provider_paths" />
         </provider>
 
+        <activity android:name="com.deniscerri.ytdl.ui.quran.QuranActivity" android:exported="false" />
     </application>
 
 </manifest>

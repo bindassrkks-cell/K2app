@@ -2,20 +2,17 @@
 <androidx.coordinatorlayout.widget.CoordinatorLayout 
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#4FC3F7">
+    android:background="#0A0B0E">
 
-    <!-- TOP APP BAR & HEADER -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/home_appbarlayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#4FC3F7"
+        android:background="#0A0B0E"
         app:elevation="0dp">
 
-        <!-- Top Branding & Settings Row -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="60dp"
@@ -23,7 +20,6 @@
             android:gravity="center_vertical"
             android:paddingHorizontal="16dp">
 
-            <!-- App Logo / Title (YouTube Kids Style) -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -31,27 +27,33 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <ImageView
-                    android:id="@+id/header_app_logo"
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="38dp"
                     android:layout_height="38dp"
-                    android:src="@drawable/ic_play"
-                    app:tint="#FF0000"
-                    android:background="@drawable/shape_circle_white"
-                    android:padding="7dp" />
+                    app:cardCornerRadius="19dp"
+                    app:cardBackgroundColor="#16181F"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="#262A36">
+                    <ImageView
+                        android:id="@+id/header_app_logo"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_play"
+                        app:tint="#00E676" />
+                </com.google.android.material.card.MaterialCardView>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="10dp"
-                    android:text="Kupido Player"
+                    android:text="Al-SHOW  BÉTÆ"
                     android:textColor="#FFFFFF"
-                    android:textSize="21sp"
-                    android:textStyle="bold"
-                    android:fontFamily="sans-serif-black" />
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- Search Quick Button -->
             <ImageView
                 android:id="@+id/btn_quick_search"
                 android:layout_width="42dp"
@@ -61,9 +63,8 @@
                 android:focusable="true"
                 android:padding="9dp"
                 android:src="@drawable/ic_search"
-                app:tint="#FFFFFF" />
+                app:tint="#E0E0E0" />
 
-            <!-- Settings Gear Button (Connects to Settings) -->
             <ImageView
                 android:id="@+id/btn_settings"
                 android:layout_width="42dp"
@@ -74,17 +75,16 @@
                 android:focusable="true"
                 android:padding="8dp"
                 android:src="@drawable/ic_settings"
-                app:tint="#FFFFFF" />
+                app:tint="#E0E0E0" />
         </LinearLayout>
 
-        <!-- Category Pills (Screenshot Style Horizontal Scroll) -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:scrollbars="none"
             android:paddingStart="14dp"
             android:paddingEnd="14dp"
-            android:paddingBottom="8dp"
+            android:paddingBottom="10dp"
             android:clipToPadding="false">
 
             <LinearLayout
@@ -93,91 +93,102 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
-                <!-- Pill 1: History / Watch It Again (Dark Active Pill) -->
-                <LinearLayout
+                <com.google.android.material.card.MaterialCardView
                     android:id="@+id/pill_history"
                     android:layout_width="wrap_content"
-                    android:layout_height="38dp"
-                    android:background="@drawable/shape_pill_black"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="8dp"
+                    app:cardCornerRadius="18dp"
+                    app:cardBackgroundColor="#1B2B23"
+                    app:strokeColor="#00E676"
+                    app:strokeWidth="1dp"
                     android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:paddingHorizontal="14dp"
-                    android:layout_marginEnd="8dp">
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:src="@drawable/ic_history"
-                        app:tint="#FFFFFF" />
-
-                    <TextView
+                    android:focusable="true">
+                    <LinearLayout
                         android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:text="Watch again"
-                        android:textColor="#FFFFFF"
-                        android:textStyle="bold"
-                        android:textSize="13sp" />
-                </LinearLayout>
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:paddingHorizontal="14dp">
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_history"
+                            app:tint="#00E676" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="Islamic Stream"
+                            android:textColor="#00E676"
+                            android:textStyle="bold"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
-                <!-- Pill 2: Downloads (Connects to Downloads Screen) -->
-                <LinearLayout
-                    android:id="@+id/pill_downloads"
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/pill_quran"
                     android:layout_width="wrap_content"
-                    android:layout_height="38dp"
-                    android:background="@drawable/shape_pill_white"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="8dp"
+                    app:cardCornerRadius="18dp"
+                    app:cardBackgroundColor="#16181F"
+                    app:strokeColor="#00E676"
+                    app:strokeWidth="1dp"
                     android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:paddingHorizontal="14dp"
-                    android:layout_marginEnd="8dp">
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:src="@drawable/ic_download"
-                        app:tint="#212121" />
-
-                    <TextView
+                    android:focusable="true">
+                    <LinearLayout
                         android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:text="Downloads"
-                        android:textColor="#212121"
-                        android:textStyle="bold"
-                        android:textSize="13sp" />
-                </LinearLayout>
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:paddingHorizontal="14dp">
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_quran"
+                            app:tint="#00E676" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="Al-Quran"
+                            android:textColor="#FFFFFF"
+                            android:textStyle="bold"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
-                <!-- Pill 3: Paste Link / URL Input -->
-                <LinearLayout
+                <com.google.android.material.card.MaterialCardView
                     android:id="@+id/pill_input_url"
                     android:layout_width="wrap_content"
-                    android:layout_height="38dp"
-                    android:background="@drawable/shape_pill_white"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="8dp"
+                    app:cardCornerRadius="18dp"
+                    app:cardBackgroundColor="#16181F"
+                    app:strokeColor="#262A36"
+                    app:strokeWidth="1dp"
                     android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:paddingHorizontal="14dp"
-                    android:layout_marginEnd="8dp">
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:src="@drawable/ic_link"
-                        app:tint="#212121" />
-
-                    <TextView
+                    android:focusable="true">
+                    <LinearLayout
                         android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:text="Paste URL"
-                        android:textColor="#212121"
-                        android:textStyle="bold"
-                        android:textSize="13sp" />
-                </LinearLayout>
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:paddingHorizontal="14dp">
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_search"
+                            app:tint="#A0A0A0" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="Paste URL"
+                            android:textColor="#E0E0E0"
+                            android:textStyle="bold"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
-                <!-- Pill 4: Playlist Filters (Auto-populated if present) -->
                 <HorizontalScrollView
                     android:id="@+id/playlist_selection_chips_scrollview"
                     android:layout_width="wrap_content"
@@ -192,34 +203,29 @@
             </LinearLayout>
         </HorizontalScrollView>
 
-        <!-- Hidden/Compat Toolbar required by HomeFragment lifecycle -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/home_toolbar"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:visibility="gone" />
 
-        <!-- SearchBar (Integrated smoothly) -->
         <com.google.android.material.search.SearchBar
             android:id="@+id/search_bar"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="46dp"
             android:layout_marginHorizontal="14dp"
-            android:layout_marginBottom="8dp"
-            android:hint="Search or paste link..."
-            app:backgroundTint="#FFFFFF"
-            app:navigationIconTint="#757575"
-            android:elevation="2dp" />
+            android:layout_marginBottom="10dp"
+            android:hint="Search Quran recitations or paste link..."
+            app:backgroundTint="#16181F"
+            android:elevation="1dp" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- CONTENT BODY (Results Grid/List) -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- Shimmer Placeholder Cards -->
         <com.facebook.shimmer.ShimmerFrameLayout
             android:id="@+id/shimmer_results_framelayout"
             android:layout_width="match_parent"
@@ -233,32 +239,26 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="220dp"
-                    android:background="@drawable/shape_card_placeholder"
+                    android:background="#16181F"
                     android:layout_marginBottom="14dp" />
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="220dp"
-                    android:background="@drawable/shape_card_placeholder" />
             </LinearLayout>
         </com.facebook.shimmer.ShimmerFrameLayout>
 
-        <!-- Recycler View for Video Result Cards -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerViewHome"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:paddingHorizontal="12dp"
-            android:paddingTop="6dp"
+            android:paddingHorizontal="10dp"
+            android:paddingTop="4dp"
             android:paddingBottom="90dp"
             android:clipToPadding="false" />
 
-        <!-- Multi-Query Chips Container -->
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/queries_constraint"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:visibility="gone"
-            android:background="#E1F5FE"
+            android:background="#16181F"
             android:padding="8dp"
             app:layout_constraintTop_toTopOf="parent">
 
@@ -291,7 +291,6 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- FLOATING ACTION BUTTONS (Download All / Selected / Clipboard) -->
     <LinearLayout
         android:id="@+id/home_fabs"
         android:layout_width="wrap_content"
@@ -304,11 +303,11 @@
             android:id="@+id/copied_url_fab"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Paste &amp; Download"
+            android:text="Paste &amp; Play"
             android:visibility="gone"
             android:layout_marginBottom="8dp"
             app:icon="@drawable/ic_link"
-            android:backgroundTint="#FFFFFF"
+            android:backgroundTint="#00E676"
             android:textColor="#000000"
             app:iconTint="#000000" />
 
@@ -320,7 +319,7 @@
             android:visibility="gone"
             android:layout_marginBottom="8dp"
             app:icon="@drawable/ic_download"
-            android:backgroundTint="#212121"
+            android:backgroundTint="#262A36"
             android:textColor="#FFFFFF" />
 
         <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
@@ -330,25 +329,24 @@
             android:text="Download Playlist"
             android:visibility="gone"
             app:icon="@drawable/ic_download"
-            android:backgroundTint="#D32F2F"
-            android:textColor="#FFFFFF"
-            app:iconTint="#FFFFFF" />
+            android:backgroundTint="#00E676"
+            android:textColor="#000000"
+            app:iconTint="#000000" />
     </LinearLayout>
 
-    <!-- FULL SEARCH VIEW -->
     <com.google.android.material.search.SearchView
         android:id="@+id/search_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:hint="Search music, videos, channels..."
+        android:hint="Search Quran recitations..."
         app:layout_anchor="@id/search_bar">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:background="#0A0B0E">
 
-            <!-- Search Providers Chips (ytsearch, etc.) -->
             <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -364,7 +362,7 @@
                 android:id="@+id/chipGroupDivider"
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:background="#E0E0E0" />
+                android:background="#1E2029" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/search_suggestions_recycler"

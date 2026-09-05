@@ -1,4 +1,7 @@
 package com.deniscerri.ytdl.ui
+import com.deniscerri.ytdl.ui.quran.QuranActivity
+import org.json.JSONArray
+import java.net.URL
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -146,6 +149,14 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        view.findViewById<android.view.View>(R.id.pill_quran)?.setOnClickListener {
+            startActivity(android.content.Intent(requireContext(), QuranActivity::class.java))
+        }
+        view.findViewById<android.view.View>(R.id.pill_history)?.setOnClickListener {
+            loadIslamicHomeContent()
+        }
+        
 
         fragmentContext = context
         layoutinflater = LayoutInflater.from(context)
