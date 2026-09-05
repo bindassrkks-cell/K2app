@@ -28,9 +28,11 @@ jobs:
           distribution: 'corretto'
           cache: 'gradle'
 
-      - name: Auto-Resolve Keystore & Properties
+      - name: Auto-Resolve Keystores & Properties
         run: |
+          mkdir -p ~/.android
           keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          cp debug.keystore ~/.android/debug.keystore
           mkdir -p app
           cp debug.keystore app/debug.keystore
           cp debug.keystore app/release_keystore.jks
@@ -44,12 +46,11 @@ jobs:
           EOF
           cp keystore.properties app/keystore.properties
 
-      - name: Auto-Inject All Missing Drawables & UI (Embedded Python)
+      - name: Auto-Inject Missing Drawables
         run: |
           python3 - << 'EOF'
           import os
 
-          # 1. Create missing drawables
           drawable_dir = 'app/src/main/res/drawable'
           os.makedirs(drawable_dir, exist_ok=True)
 
@@ -88,16 +89,15 @@ jobs:
           for name, content in drawables.items():
               with open(os.path.join(drawable_dir, name), 'w') as f:
                   f.write(content)
-
-          print("Successfully injected all required vector icons!")
           EOF
 
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
+      # Zero Noise Build: Warnings suppress ki gayi hain taaki clean build ho
       - name: Build Android APK
         run: |
-          ./gradlew :${{ env.main_project_module }}:assembleRelease --stacktrace || ./gradlew assembleRelease --stacktrace || ./gradlew assembleDebug --stacktrace
+          ./gradlew :${{ env.main_project_module }}:assembleRelease --warning-mode none
 
       - name: Collect Output APKs
         run: |
