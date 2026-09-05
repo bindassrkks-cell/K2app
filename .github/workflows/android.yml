@@ -29,6 +29,7 @@ jobs:
           cache: 'gradle'
 
       - name: Auto-Resolve Keystores & Properties
+        shell: bash
         run: |
           mkdir -p ~/.android
           keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
@@ -38,23 +39,19 @@ jobs:
           cp debug.keystore app/release_keystore.jks
           cp debug.keystore release_keystore.jks
           touch local.properties
-          cat << 'EOF' > keystore.properties
-          storeFile=release_keystore.jks
-          storePassword=android
-          keyAlias=androiddebugkey
-          keyPassword=android
-          EOF
+          echo "storeFile=release_keystore.jks" > keystore.properties
+          echo "storePassword=android" >> keystore.properties
+          echo "keyAlias=androiddebugkey" >> keystore.properties
+          echo "keyPassword=android" >> keystore.properties
           cp keystore.properties app/keystore.properties
 
       - name: Inject Quran Feature, AMOLED Dark UI & All Fixes
+        shell: python
         run: |
-          python3 - << 'PYEOF'
           import os
           import re
 
-          # -------------------------------------------------------------------
-          # 1. CREATE ALL VECTOR ICONS (QURAN, AUDIO, MORE_VERT, ETC.)
-          # -------------------------------------------------------------------
+          # 1. GENERATE ALL VECTOR DRAWABLES
           drawable_dir = 'app/src/main/res/drawable'
           os.makedirs(drawable_dir, exist_ok=True)
 
@@ -109,15 +106,12 @@ jobs:
               with open(os.path.join(drawable_dir, name), 'w', encoding='utf-8') as f:
                   f.write(content)
 
-          # -------------------------------------------------------------------
-          # 2. QURAN FEATURE: ACTIVITY, LAYOUTS & MANIFEST DECLARATION
-          # -------------------------------------------------------------------
-          quran_pkg_dir = 'app/src/main/java/com/deniscerri/ytdl/ui/quran'
-          os.makedirs(quran_pkg_dir, exist_ok=True)
+          # 2. QURAN MODULE (ACTIVITY, ADAPTER, AUDIO STREAMING, READER)
+          quran_dir = 'app/src/main/java/com/deniscerri/ytdl/ui/quran'
+          os.makedirs(quran_dir, exist_ok=True)
           layout_dir = 'app/src/main/res/layout'
           os.makedirs(layout_dir, exist_ok=True)
 
-          # Quran Activity Layout
           with open(os.path.join(layout_dir, 'activity_quran.xml'), 'w', encoding='utf-8') as f:
               f.write('''<?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -158,7 +152,7 @@ jobs:
                   android:layout_width="match_parent"
                   android:layout_height="44dp"
                   android:layout_margin="12dp"
-                  android:background="@drawable/shape_card_placeholder"
+                  android:background="@drawable/ic_link"
                   android:backgroundTint="#16181F"
                   android:paddingHorizontal="16dp"
                   android:hint="Search Surah by name or number..."
@@ -181,7 +175,6 @@ jobs:
                   android:layout_weight="1"
                   android:padding="8dp" />
 
-              <!-- Persistent Audio Player Bar -->
               <LinearLayout
                   android:id="@+id/audio_player_bar"
                   android:layout_width="match_parent"
@@ -233,7 +226,6 @@ jobs:
               </LinearLayout>
           </LinearLayout>''')
 
-          # Surah Item Layout
           with open(os.path.join(layout_dir, 'item_surah.xml'), 'w', encoding='utf-8') as f:
               f.write('''<?xml version="1.0" encoding="utf-8"?>
           <com.google.android.material.card.MaterialCardView 
@@ -258,8 +250,6 @@ jobs:
                       android:id="@+id/surah_number"
                       android:layout_width="36dp"
                       android:layout_height="36dp"
-                      android:background="@drawable/shape_card_placeholder"
-                      android:backgroundTint="#1B2B23"
                       android:gravity="center"
                       android:textColor="#00E676"
                       android:textSize="13sp"
@@ -307,7 +297,6 @@ jobs:
               </LinearLayout>
           </com.google.android.material.card.MaterialCardView>''')
 
-          # Quran Ayah Reader Dialog Layout
           with open(os.path.join(layout_dir, 'dialog_quran_surah.xml'), 'w', encoding='utf-8') as f:
               f.write('''<?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -323,7 +312,7 @@ jobs:
                   android:layout_height="wrap_content"
                   android:gravity="center"
                   android:textColor="#00E676"
-                  android:textSize="20sp"
+                  android:textSize="18sp"
                   android:textStyle="bold" />
 
               <ProgressBar
@@ -342,13 +331,12 @@ jobs:
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
                       android:textColor="#E0E0E0"
-                      android:textSize="16sp"
-                      android:lineSpacingMultiplier="1.4" />
+                      android:textSize="15sp"
+                      android:lineSpacingMultiplier="1.3" />
               </ScrollView>
           </LinearLayout>''')
 
-          # QuranActivity.kt
-          with open(os.path.join(quran_pkg_dir, 'QuranActivity.kt'), 'w', encoding='utf-8') as f:
+          with open(os.path.join(quran_dir, 'QuranActivity.kt'), 'w', encoding='utf-8') as f:
               f.write('''package com.deniscerri.ytdl.ui.quran
 
           import android.media.AudioAttributes
@@ -482,14 +470,14 @@ jobs:
 
               private fun playSurahAudio(surah: Surah) {
                   audioPlayerBar.visibility = View.VISIBLE
-                  audioSurahTitle.text = "${surah.number}. ${surah.englishName} (${surah.name})"
+                  audioSurahTitle.text = surah.number.toString() + ". " + surah.englishName + " (" + surah.name + ")"
                   btnAudioPlayPause.setImageResource(R.drawable.ic_pause)
 
                   stopAudio()
                   currentlyPlayingSurah = surah.number
 
                   val audioUrl = String.format("https://server8.mp3quran.net/afs/%03d.mp3", surah.number)
-                  Toast.makeText(this, "Streaming Surah ${surah.englishName}...", Toast.LENGTH_SHORT).show()
+                  Toast.makeText(this, "Streaming Surah " + surah.englishName + "...", Toast.LENGTH_SHORT).show()
 
                   lifecycleScope.launch(Dispatchers.IO) {
                       try {
@@ -506,7 +494,7 @@ jobs:
                           }
                       } catch (e: Exception) {
                           withContext(Dispatchers.Main) {
-                              Toast.makeText(this@QuranActivity, "Audio error: ${e.message}", Toast.LENGTH_SHORT).show()
+                              Toast.makeText(this@QuranActivity, "Audio stream error", Toast.LENGTH_SHORT).show()
                           }
                       }
                   }
@@ -518,7 +506,7 @@ jobs:
                   val content = dialogView.findViewById<TextView>(R.id.ayah_content)
                   val loading = dialogView.findViewById<ProgressBar>(R.id.ayah_loading)
 
-                  title.text = "${surah.name}\\n${surah.englishName} - ${surah.numberOfAyahs} Ayahs"
+                  title.text = surah.name + " (" + surah.englishName + ") - " + surah.numberOfAyahs + " Ayahs"
 
                   val dialog = MaterialAlertDialogBuilder(this)
                       .setView(dialogView)
@@ -529,7 +517,7 @@ jobs:
                   lifecycleScope.launch(Dispatchers.IO) {
                       val sb = StringBuilder()
                       try {
-                          val apiUrl = "https://api.alquran.cloud/v1/surah/${surah.number}/editions/quran-uthmani,en.sahih"
+                          val apiUrl = "https://api.alquran.cloud/v1/surah/" + surah.number + "/editions/quran-uthmani,en.sahih"
                           val text = URL(apiUrl).readText()
                           val json = JSONObject(text)
                           val dataArr = json.getJSONArray("data")
@@ -540,10 +528,10 @@ jobs:
                               val arText = arabicAyahs.getJSONObject(i).getString("text")
                               val enText = englishAyahs.getJSONObject(i).getString("text")
                               val num = i + 1
-                              sb.append("[$num] $arText\\n$enText\\n\\n")
+                              sb.append("[" + num + "] " + arText + "\\n" + enText + "\\n\\n")
                           }
                       } catch (e: Exception) {
-                          sb.append("Error loading Ayahs: ${e.message}")
+                          sb.append("Error loading Ayahs: " + e.message)
                       }
 
                       withContext(Dispatchers.Main) {
@@ -588,7 +576,7 @@ jobs:
                   val item = list[position]
                   holder.number.text = item.number.toString()
                   holder.english.text = item.englishName
-                  holder.meta.text = "${item.englishTranslation} • ${item.numberOfAyahs} Ayahs • ${item.revelationType}"
+                  holder.meta.text = item.englishTranslation + " • " + item.numberOfAyahs + " Ayahs • " + item.revelationType
                   holder.arabic.text = item.name
 
                   holder.itemView.setOnClickListener { onSurahClick(item) }
@@ -603,28 +591,22 @@ jobs:
               }
           }''')
 
-          # -------------------------------------------------------------------
-          # 3. REGISTER QURANACTIVITY IN ANDROIDMANIFEST.XML
-          # -------------------------------------------------------------------
+          # 3. REGISTER QURAN IN MANIFEST & MORE SCREEN
           manifest_path = 'app/src/main/AndroidManifest.xml'
           if os.path.exists(manifest_path):
               with open(manifest_path, 'r', encoding='utf-8') as f:
                   m_content = f.read()
 
               if 'com.deniscerri.ytdl.ui.quran.QuranActivity' not in m_content:
-                  activity_entry = '''        <activity
+                  entry = '''        <activity
                       android:name="com.deniscerri.ytdl.ui.quran.QuranActivity"
                       android:exported="false"
                       android:theme="@style/Theme.YTDLnis" />
               </application>'''
-                  m_content = m_content.replace('</application>', activity_entry)
+                  m_content = m_content.replace('</application>', entry)
                   with open(manifest_path, 'w', encoding='utf-8') as f:
                       f.write(m_content)
-                  print("Registered QuranActivity in AndroidManifest.xml")
 
-          # -------------------------------------------------------------------
-          # 4. ADD QURAN BUTTON IN MORE NAVIGATION (FRAGMENT_MORE & MOREFRAGMENT)
-          # -------------------------------------------------------------------
           more_xml_path = 'app/src/main/res/layout/fragment_more.xml'
           if os.path.exists(more_xml_path):
               with open(more_xml_path, 'r', encoding='utf-8') as f:
@@ -658,18 +640,287 @@ jobs:
 
               if 'com.deniscerri.ytdl.ui.quran.QuranActivity' not in mkt:
                   mkt = "import com.deniscerri.ytdl.ui.quran.QuranActivity\n" + mkt
-                  quran_click_logic = '''        view.findViewById<TextView>(R.id.quran_app)?.setOnClickListener {
+                  quran_code = '''        view.findViewById<TextView>(R.id.quran_app)?.setOnClickListener {
                       startActivity(android.content.Intent(requireContext(), QuranActivity::class.java))
                   }
           '''
-                  mkt = mkt.replace('settings = view.findViewById(R.id.settings)', quran_click_logic + '\n        settings = view.findViewById(R.id.settings)')
+                  mkt = mkt.replace('settings = view.findViewById(R.id.settings)', quran_code + '\n        settings = view.findViewById(R.id.settings)')
                   with open(more_kt_path, 'w', encoding='utf-8') as f:
                       f.write(mkt)
-                  print("Added Quran navigation click in MoreFragment.kt")
 
-          # -------------------------------------------------------------------
-          # 5. PURE AMOLED DARK FRAGMENT_HOME.XML (Al-SHOW  BÉTÆ + QURAN PILL)
-          # -------------------------------------------------------------------
+          # 4. SOCIAL FEED (REPLACING HISTORY)
+          with open(os.path.join(layout_dir, 'fragment_social_feed.xml'), 'w', encoding='utf-8') as f:
+              f.write('''<?xml version="1.0" encoding="utf-8"?>
+          <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="#0A0B0E">
+
+              <androidx.recyclerview.widget.RecyclerView
+                  android:id="@+id/social_recycler"
+                  android:layout_width="match_parent"
+                  android:layout_height="match_parent"
+                  android:padding="12dp"
+                  android:clipToPadding="false" />
+
+              <ProgressBar
+                  android:id="@+id/social_progress"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_gravity="center"
+                  android:visibility="gone" />
+          </FrameLayout>''')
+
+          with open(os.path.join(layout_dir, 'item_social_post.xml'), 'w', encoding='utf-8') as f:
+              f.write('''<?xml version="1.0" encoding="utf-8"?>
+          <com.google.android.material.card.MaterialCardView
+              xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              android:id="@+id/post_card"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:layout_marginBottom="12dp"
+              app:cardCornerRadius="16dp"
+              app:cardBackgroundColor="#16181F"
+              app:strokeColor="#262A36"
+              app:strokeWidth="1dp"
+              android:clickable="true"
+              android:focusable="true">
+
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="vertical">
+
+                  <ImageView
+                      android:id="@+id/post_thumb"
+                      android:layout_width="match_parent"
+                      android:layout_height="180dp"
+                      android:scaleType="centerCrop" />
+
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:padding="14dp"
+                      android:orientation="vertical">
+
+                      <TextView
+                          android:id="@+id/post_date"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:textColor="#00E676"
+                          android:textSize="11sp"
+                          android:textStyle="bold" />
+
+                      <TextView
+                          android:id="@+id/post_title"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="4dp"
+                          android:textColor="#FFFFFF"
+                          android:textSize="15sp"
+                          android:textStyle="bold" />
+
+                      <TextView
+                          android:id="@+id/post_summary"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="4dp"
+                          android:maxLines="3"
+                          android:ellipsize="end"
+                          android:textColor="#A0A0A0"
+                          android:textSize="13sp" />
+                  </LinearLayout>
+              </LinearLayout>
+          </com.google.android.material.card.MaterialCardView>''')
+
+          with open(os.path.join(layout_dir, 'dialog_social_post_detail.xml'), 'w', encoding='utf-8') as f:
+              f.write('''<?xml version="1.0" encoding="utf-8"?>
+          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:background="#16181F">
+
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="vertical"
+                  android:padding="16dp">
+
+                  <ImageView
+                      android:id="@+id/detail_image"
+                      android:layout_width="match_parent"
+                      android:layout_height="200dp"
+                      android:scaleType="centerCrop"
+                      android:layout_marginBottom="12dp" />
+
+                  <TextView
+                      android:id="@+id/detail_title"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:textColor="#FFFFFF"
+                      android:textSize="18sp"
+                      android:textStyle="bold" />
+
+                  <TextView
+                      android:id="@+id/detail_content"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="10dp"
+                      android:textColor="#D0D0D0"
+                      android:textSize="14sp"
+                      android:lineSpacingMultiplier="1.3" />
+              </LinearLayout>
+          </ScrollView>''')
+
+          history_kt_path = 'app/src/main/java/com/deniscerri/ytdl/ui/downloads/HistoryFragment.kt'
+          with open(history_kt_path, 'w', encoding='utf-8') as f:
+              f.write('''package com.deniscerri.ytdl.ui.downloads
+
+          import android.os.Bundle
+          import android.view.LayoutInflater
+          import android.view.View
+          import android.view.ViewGroup
+          import android.widget.ImageView
+          import android.widget.ProgressBar
+          import android.widget.TextView
+          import androidx.fragment.app.Fragment
+          import androidx.lifecycle.lifecycleScope
+          import androidx.recyclerview.widget.LinearLayoutManager
+          import androidx.recyclerview.widget.RecyclerView
+          import coil.load
+          import com.deniscerri.ytdl.R
+          import com.google.android.material.card.MaterialCardView
+          import com.google.android.material.dialog.MaterialAlertDialogBuilder
+          import kotlinx.coroutines.Dispatchers
+          import kotlinx.coroutines.launch
+          import kotlinx.coroutines.withContext
+          import org.json.JSONArray
+          import java.net.URL
+
+          data class SocialPost(
+              val title: String,
+              val date: String,
+              val thumbnail: String,
+              val content: String
+          )
+
+          class HistoryFragment : Fragment() {
+
+              private lateinit var recyclerView: RecyclerView
+              private lateinit var progressBar: ProgressBar
+
+              override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+                  val view = inflater.inflate(R.layout.fragment_social_feed, container, false)
+                  recyclerView = view.findViewById(R.id.social_recycler)
+                  progressBar = view.findViewById(R.id.social_progress)
+                  recyclerView.layoutManager = LinearLayoutManager(context)
+
+                  loadSocialFeed()
+                  return view
+              }
+
+              private fun loadSocialFeed() {
+                  progressBar.visibility = View.VISIBLE
+                  lifecycleScope.launch(Dispatchers.IO) {
+                      val posts = mutableListOf<SocialPost>()
+                      try {
+                          val jsonUrl = "https://raw.githubusercontent.com/Bindassrkks/K2app/main/social.json"
+                          val text = URL(jsonUrl).readText()
+                          val array = JSONArray(text)
+                          for (i in 0 until array.length()) {
+                              val obj = array.getJSONObject(i)
+                              posts.add(
+                                  SocialPost(
+                                      title = obj.optString("title", "Islamic Post"),
+                                      date = obj.optString("date", "Today"),
+                                      thumbnail = obj.optString("thumbnail", ""),
+                                      content = obj.optString("content", "")
+                                  )
+                              )
+                          }
+                      } catch (e: Exception) {
+                          e.printStackTrace()
+                      }
+
+                      withContext(Dispatchers.Main) {
+                          progressBar.visibility = View.GONE
+                          recyclerView.adapter = SocialFeedAdapter(posts) { post ->
+                              showPostDetailsDialog(post)
+                          }
+                      }
+                  }
+              }
+
+              private fun showPostDetailsDialog(post: SocialPost) {
+                  val dialogView = layoutInflater.inflate(R.layout.dialog_social_post_detail, null)
+                  val img = dialogView.findViewById<ImageView>(R.id.detail_image)
+                  val title = dialogView.findViewById<TextView>(R.id.detail_title)
+                  val content = dialogView.findViewById<TextView>(R.id.detail_content)
+
+                  title.text = post.title
+                  content.text = post.content
+                  if (post.thumbnail.isNotEmpty()) {
+                      img.load(post.thumbnail)
+                      img.visibility = View.VISIBLE
+                  } else {
+                      img.visibility = View.GONE
+                  }
+
+                  MaterialAlertDialogBuilder(requireContext())
+                      .setView(dialogView)
+                      .setPositiveButton("Close", null)
+                      .show()
+              }
+
+              fun openSearchView() {}
+          }
+
+          class SocialFeedAdapter(
+              private val list: List<SocialPost>,
+              private val onClick: (SocialPost) -> Unit
+          ) : RecyclerView.Adapter<SocialFeedAdapter.ViewHolder>() {
+
+              class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
+                  val card: MaterialCardView = v.findViewById(R.id.post_card)
+                  val thumb: ImageView = v.findViewById(R.id.post_thumb)
+                  val title: TextView = v.findViewById(R.id.post_title)
+                  val date: TextView = v.findViewById(R.id.post_date)
+                  val summary: TextView = v.findViewById(R.id.post_summary)
+              }
+
+              override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+                  val v = LayoutInflater.from(parent.context).inflate(R.layout.item_social_post, parent, false)
+                  return ViewHolder(v)
+              }
+
+              override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+                  val item = list[position]
+                  holder.title.text = item.title
+                  holder.date.text = item.date
+                  holder.summary.text = item.content
+                  if (item.thumbnail.isNotEmpty()) {
+                      holder.thumb.load(item.thumbnail)
+                      holder.thumb.visibility = View.VISIBLE
+                  } else {
+                      holder.thumb.visibility = View.GONE
+                  }
+                  holder.card.setOnClickListener { onClick(item) }
+              }
+
+              override fun getItemCount() = list.size
+          }''')
+
+          # 5. UPDATE BOTTOM NAV LABEL TO "SOCIAL FEED"
+          menu_path = 'app/src/main/res/menu/main_nav_menu.xml'
+          if os.path.exists(menu_path):
+              with open(menu_path, 'r', encoding='utf-8') as f:
+                  mcontent = f.read()
+              mcontent = re.sub(r'(<item\s+android:id="@+id/historyFragment".*?android:title=)"[^"]*"', r'\1"Social Feed"', mcontent)
+              with open(menu_path, 'w', encoding='utf-8') as f:
+                  f.write(mcontent)
+
+          # 6. AMOLED DARK HOME XML (Al-SHOW  BÉTÆ)
           home_xml_path = 'app/src/main/res/layout/fragment_home.xml'
           with open(home_xml_path, 'w', encoding='utf-8') as f:
               f.write('''<?xml version="1.0" encoding="utf-8"?>
@@ -752,7 +1003,6 @@ jobs:
                           app:tint="#E0E0E0" />
                   </LinearLayout>
 
-                  <!-- Horizontal Filter Pills -->
                   <HorizontalScrollView
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
@@ -768,7 +1018,6 @@ jobs:
                           android:orientation="horizontal"
                           android:gravity="center_vertical">
 
-                          <!-- Islamic Stream Reload -->
                           <com.google.android.material.card.MaterialCardView
                               android:id="@+id/pill_history"
                               android:layout_width="wrap_content"
@@ -801,7 +1050,6 @@ jobs:
                               </LinearLayout>
                           </com.google.android.material.card.MaterialCardView>
 
-                          <!-- Al-Quran Full Feature Direct Pill -->
                           <com.google.android.material.card.MaterialCardView
                               android:id="@+id/pill_quran"
                               android:layout_width="wrap_content"
@@ -834,7 +1082,6 @@ jobs:
                               </LinearLayout>
                           </com.google.android.material.card.MaterialCardView>
 
-                          <!-- Paste Link Pill -->
                           <com.google.android.material.card.MaterialCardView
                               android:id="@+id/pill_input_url"
                               android:layout_width="wrap_content"
@@ -1051,12 +1298,10 @@ jobs:
 
           </androidx.coordinatorlayout.widget.CoordinatorLayout>''')
 
-          # -------------------------------------------------------------------
-          # 6. INJECT 100% CLEAN HOMEFRAGMENT.KT (USES .lines() TO AVOID ESCAPES)
-          # -------------------------------------------------------------------
+          # 7. CLEAN SYNTAX HOMEFRAGMENT.KT (USES .lines() TO AVOID ESCAPE ISSUES)
           home_kt_path = 'app/src/main/java/com/deniscerri/ytdl/ui/HomeFragment.kt'
           with open(home_kt_path, 'w', encoding='utf-8') as f:
-              f.write(r'''package com.deniscerri.ytdl.ui
+              f.write('''package com.deniscerri.ytdl.ui
 
           import android.annotation.SuppressLint
           import android.app.Activity
@@ -1363,7 +1608,7 @@ jobs:
                                       },
                                       cookieFetch = {
                                           val myIntent = Intent(requireContext(), WebViewActivity::class.java)
-                                          myIntent.putExtra("url", "https://${URL(queryList.first()).host}")
+                                          myIntent.putExtra("url", "https://" + URL(queryList.first()).host)
                                           cookiesFetchedResultLauncher.launch(myIntent)
                                       },
                                       closed = {}
@@ -1441,11 +1686,7 @@ jobs:
                   lifecycleScope.launch(Dispatchers.IO) {
                       try {
                           val jsonUrl = "https://raw.githubusercontent.com/Bindassrkks/K2app/main/data.json"
-                          val connection = URL(jsonUrl).openConnection()
-                          connection.connectTimeout = 6000
-                          connection.readTimeout = 6000
-                          val text = connection.getInputStream().bufferedReader().use { it.readText() }
-
+                          val text = URL(jsonUrl).readText()
                           val jsonArray = JSONArray(text)
                           val urls = mutableListOf<String>()
                           for (i in 0 until jsonArray.length()) {
@@ -1657,7 +1898,7 @@ jobs:
                   if (searchView!!.editText.text.isEmpty()) {
                       searchView!!.editText.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
                   } else {
-                      searchView!!.editText.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_plus, 0)
+                      searchView!!.editText.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_link, 0)
                   }
 
                   val combinedList = mutableListOf<SearchSuggestionItem>()
@@ -1679,7 +1920,7 @@ jobs:
                   url?.apply {
                       val alreadyHasThem = this.all { queriesChipGroup?.children?.any { c -> (c as Chip).text.contains(it) } == true }
                       if (this.isNotEmpty() && !alreadyHasThem) {
-                          combinedList.add(0, SearchSuggestionItem(this.joinToString("\n"), SearchSuggestionType.CLIPBOARD))
+                          combinedList.add(0, SearchSuggestionItem(this.joinToString("\\n"), SearchSuggestionType.CLIPBOARD))
                       }
                   }
 
@@ -1881,7 +2122,7 @@ jobs:
                                   if (showDownloadCard && selectedObjects.size == 1) {
                                       val resultItem = withContext(Dispatchers.IO) { resultViewModel.getByID(selectedObjects.first()) }
                                       resultItem?.apply {
-                                          showSingleDownloadSheet(resultItem, downloadViewModel.getDownloadType(url = resultItem.url))
+                                          showSingleDownloadSheet(resultItem, downloadViewModel.getDownloadType(DownloadType.video, resultItem.url))
                                       }
                                   } else {
                                       downloadViewModel.turnResultItemsToProcessingDownloads(selectedObjects, downloadNow = !showDownloadCard)
@@ -1979,7 +2220,7 @@ jobs:
 
               override fun onSearchSuggestionLongClick(text: String, position: Int) {
                   val deleteDialog = MaterialAlertDialogBuilder(requireContext())
-                  deleteDialog.setTitle("${getString(R.string.you_are_going_to_delete)} '$text'!")
+                  deleteDialog.setTitle(getString(R.string.you_are_going_to_delete) + " " + text)
                   deleteDialog.setNegativeButton(getString(R.string.cancel)) { dialogInterface: DialogInterface, _: Int -> dialogInterface.cancel() }
                   deleteDialog.setPositiveButton(getString(R.string.ok)) { _: DialogInterface?, _: Int ->
                       resultViewModel.removeSearchQueryFromHistory(text)
@@ -2021,20 +2262,21 @@ jobs:
 
                   playlistNameFilterScrollView.isVisible = true
               }
-          }
-          ''')
+          }''')
 
-          print("Successfully injected Quran Feature, AMOLED Dark UI, and error-free Kotlin code!")
-          PYEOF
+          print("SUCCESS: Injected Quran, Social Feed, AMOLED Theme and clean HomeFragment!")
 
       - name: Grant Execute Permission for Gradlew
+        shell: bash
         run: chmod +x gradlew
 
       - name: Build Android APK
+        shell: bash
         run: |
           ./gradlew :${{ env.main_project_module }}:assembleRelease --warning-mode none
 
       - name: Collect Output APKs
+        shell: bash
         run: |
           mkdir -p build_output_apks
           find . -type f -name "*.apk" -not -path "*/intermediates/*" -exec cp {} build_output_apks/ \;
