@@ -9,8 +9,21 @@ permissions:
 on:
   push:
     branches:
-      - "**"
+      - '**'
+    tags:
+      - 'v*'
+      - '*'
+  pull_request:
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Select Build Type'
+        required: false
+        default: 'assembleRelease'
+        type: choice
+        options:
+          - assembleRelease
+          - assembleDebug
 
 jobs:
   build:
@@ -20,6 +33,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -31,6 +45,7 @@ jobs:
       - name: Setup Keystores & Properties
         run: |
           mkdir -p ~/.android app
+          rm -f debug.keystore release_keystore.jks app/debug.keystore app/release_keystore.jks
           keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           cp debug.keystore ~/.android/debug.keystore
           cp debug.keystore app/debug.keystore
@@ -624,7 +639,7 @@ jobs:
                       android:background="?android:attr/selectableItemBackground"
                       android:paddingHorizontal="15dp"
                       app:drawableStartCompat="@drawable/ic_quran" />
-      '''
+          '''
                   mxml = re.sub(r'(<TextView\s+android:id="@+id/settings".*?/>)', quran_view + r'\1', mxml, flags=re.DOTALL)
                   with open(more_xml_path, 'w', encoding='utf-8') as f:
                       f.write(mxml)
@@ -1457,7 +1472,7 @@ jobs:
               ): View? {
                   fragmentView = inflater.inflate(R.layout.fragment_home, container, false)
                   activity = getActivity()
-                  mainActivity = activity as MainActivity?
+                  mainActivity = activity as? MainActivity
                   quickLaunchSheet = false
                   notificationUtil = NotificationUtil(requireContext())
                   return fragmentView
@@ -1663,7 +1678,7 @@ jobs:
 
               fun scrollToTop() {
                   recyclerView?.scrollToPosition(0)
-                  runCatching { (searchBar?.parent as? AppBarLayout)?.setExpanded(true, true) }
+                  runCatching { appBarLayout?.setExpanded(true, true) }
               }
 
               private fun openSettingsScreen() {
@@ -2085,12 +2100,12 @@ jobs:
                   override fun onCreateActionMode(mode: ActionMode?, menu: Menu?): Boolean {
                       mode!!.menuInflater.inflate(R.menu.main_menu_context, menu)
                       mode.title = "${homeAdapter.getSelectedObjectsCount(totalCount)} ${getString(R.string.selected)}"
-                      searchBar!!.isEnabled = false
+                      searchBar?.isEnabled = false
                       playlistNameFilterChipGroup.children.forEach { it.isEnabled = false }
-                      searchBar!!.menu.forEach { it.isEnabled = false }
-                      (activity as MainActivity).disableBottomNavigation()
-                      downloadAllFab!!.isVisible = false
-                      clipboardFab!!.isVisible = false
+                      searchBar?.menu?.forEach { it.isEnabled = false }
+                      (activity as? MainActivity)?.disableBottomNavigation()
+                      downloadAllFab?.isVisible = false
+                      clipboardFab?.isVisible = false
                       return true
                   }
 
@@ -2165,15 +2180,15 @@ jobs:
                   }
 
                   override fun onDestroyActionMode(mode: ActionMode?) {
-                  actionMode = null
-                  (activity as MainActivity).enableBottomNavigation()
-                  homeAdapter.clearCheckedItems()
-                  searchBar!!.isEnabled = true
-                  playlistNameFilterChipGroup.children.forEach { it.isEnabled = true }
-                  searchBar!!.menu.forEach { it.isEnabled = true }
-                  searchBar?.expand(appBarLayout!)
-                  downloadAllFab!!.isVisible = showDownloadAllFab
-                  clipboardFab!!.isVisible = showClipboardFab
+                      actionMode = null
+                      (activity as? MainActivity)?.enableBottomNavigation()
+                      homeAdapter.clearCheckedItems()
+                      searchBar?.isEnabled = true
+                      playlistNameFilterChipGroup.children.forEach { it.isEnabled = true }
+                      searchBar?.menu?.forEach { it.isEnabled = true }
+                      appBarLayout?.setExpanded(true, true)
+                      downloadAllFab?.isVisible = showDownloadAllFab
+                      clipboardFab?.isVisible = showClipboardFab
                   }
 
                   suspend fun getSelectedIDs(): List<Long> {
@@ -2188,8 +2203,8 @@ jobs:
               private fun checkClipboard(): List<String>? {
                   return kotlin.runCatching {
                       val clipboard = requireContext().getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                      val clip = clipboard.primaryClip!!.getItemAt(0).text
-                      return clip.lines().map { it.trim() }.filter { Patterns.WEB_URL.matcher(it).matches() }
+                      val clip = clipboard.primaryClip?.getItemAt(0)?.text ?: return null
+                      clip.lines().map { it.trim() }.filter { Patterns.WEB_URL.matcher(it).matches() }
                   }.getOrNull()
               }
 
@@ -2198,7 +2213,7 @@ jobs:
                   if (res.size == 1) {
                       showClipboardFab = false
                       clipboardFab?.isVisible = false
-                      searchView!!.setText(text)
+                      searchView?.setText(text)
                       initSearch(searchView!!)
                   } else {
                       res.forEach { onSearchSuggestionAdd(it) }
@@ -2208,21 +2223,21 @@ jobs:
               override fun onSearchSuggestionAdd(text: String) {
                   val items = text.lines()
                   items.forEach { t ->
-                      val present = queriesChipGroup!!.children.firstOrNull { (it as Chip).text.toString() == t }
+                      val present = queriesChipGroup?.children?.firstOrNull { (it as Chip).text.toString() == t }
                       if (present == null) {
                           val chip = layoutinflater!!.inflate(R.layout.input_chip, queriesChipGroup, false) as Chip
                           chip.text = t
                           chip.chipBackgroundColor = ColorStateList.valueOf(MaterialColors.getColor(requireContext(), R.attr.colorSecondaryContainer, Color.BLACK))
                           chip.setOnClickListener {
-                              if (queriesChipGroup!!.childCount == 1) queriesConstraint!!.visibility = View.GONE
-                              queriesChipGroup!!.removeView(chip)
+                              if (queriesChipGroup?.childCount == 1) queriesConstraint?.visibility = View.GONE
+                              queriesChipGroup?.removeView(chip)
                           }
-                          queriesChipGroup!!.addView(chip)
+                          queriesChipGroup?.addView(chip)
                       }
                   }
 
-                  searchView!!.editText.setText("")
-                  queriesConstraint?.isVisible = queriesChipGroup?.childCount! > 0
+                  searchView?.editText?.setText("")
+                  queriesConstraint?.isVisible = (queriesChipGroup?.childCount ?: 0) > 0
 
                   searchSuggestionsAdapter?.getList()?.apply {
                       if (this.isNotEmpty() && this.first().type == SearchSuggestionType.CLIPBOARD) {
@@ -2238,14 +2253,14 @@ jobs:
                   deleteDialog.setNegativeButton(getString(R.string.cancel)) { dialogInterface: DialogInterface, _: Int -> dialogInterface.cancel() }
                   deleteDialog.setPositiveButton(getString(R.string.ok)) { _: DialogInterface?, _: Int ->
                       resultViewModel.removeSearchQueryFromHistory(text)
-                      updateSearchViewItems(searchView!!.editText.text.toString())
+                      updateSearchViewItems(searchView?.editText?.text.toString())
                   }
                   deleteDialog.show()
               }
 
               override fun onSearchSuggestionAddToSearchBar(text: String) {
-                  searchView!!.editText.setText(text)
-                  searchView!!.editText.setSelection(searchView!!.editText.length())
+                  searchView?.editText?.setText(text)
+                  searchView?.editText?.let { it.setSelection(it.length()) }
               }
 
               private fun updateMultiplePlaylistResults(playlistTitles: List<String>) {
@@ -2276,7 +2291,8 @@ jobs:
 
                   playlistNameFilterScrollView.isVisible = true
               }
-          }''')
+          }
+          ''')
 
           print("SUCCESS: Patcher executed completely!")
           EOF
@@ -2284,9 +2300,11 @@ jobs:
       - name: Build Android APK
         run: |
           chmod +x gradlew
-          ./gradlew :${{ env.main_project_module }}:assembleRelease --warning-mode none
+          BUILD_TASK="${{ inputs.build_type || 'assembleRelease' }}"
+          ./gradlew ":${{ env.main_project_module }}:${BUILD_TASK}" --stacktrace --warning-mode none
 
       - name: Collect Output APKs
+        if: success()
         run: |
           mkdir -p build_output_apks
           find . -type f -name "*.apk" -not -path "*/intermediates/*" -exec cp {} build_output_apks/ \;
@@ -2295,7 +2313,8 @@ jobs:
 
       - name: Upload APKs Artifact
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: App-Release-Builds
           path: build_output_apks/
-          if-no-files-found: error
+          if-no-files-found: warn
