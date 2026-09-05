@@ -1,27 +1,61 @@
-name: Push Missing Fixes to Repo
+name: Android CI Auto-Build
+
+env:
+  main_project_module: app
 
 permissions:
   contents: write
 
 on:
+  push:
+    branches:
+      - '**'
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Select Build Type'
+        required: false
+        default: 'assembleRelease'
+        type: choice
+        options:
+          - assembleRelease
+          - assembleDebug
 
 jobs:
-  commit_missing_files:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
 
-      - name: Generate Missing Drawables, Themes and Layouts
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'corretto'
+          cache: 'gradle'
+
+      - name: Setup Keystores & Properties
+        run: |
+          mkdir -p ~/.android app
+          rm -f debug.keystore release_keystore.jks app/debug.keystore app/release_keystore.jks
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          cp debug.keystore ~/.android/debug.keystore
+          cp debug.keystore app/debug.keystore
+          cp debug.keystore app/release_keystore.jks
+          cp debug.keystore release_keystore.jks
+          touch local.properties
+          printf "storeFile=release_keystore.jks\nstorePassword=android\nkeyAlias=androiddebugkey\nkeyPassword=android\n" > keystore.properties
+          cp keystore.properties app/keystore.properties
+
+      - name: Ensure Missing Drawables Exist
         run: |
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/values
 
-          # 1. Missing Theme compatibility
           cat << 'EOF' > app/src/main/res/values/theme_compat.xml
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -29,7 +63,6 @@ jobs:
           </resources>
           EOF
 
-          # 2. Missing Drawable: ic_download
           cat << 'EOF' > app/src/main/res/drawable/ic_download.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp"
@@ -42,7 +75,6 @@ jobs:
           </vector>
           EOF
 
-          # 3. Missing Drawable: ic_more_vert
           cat << 'EOF' > app/src/main/res/drawable/ic_more_vert.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp"
@@ -55,63 +87,26 @@ jobs:
           </vector>
           EOF
 
-          # 4. Supplementary Drawables
-          cat << 'EOF' > app/src/main/res/drawable/ic_quran.xml
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="24dp"
-              android:height="24dp"
-              android:viewportWidth="24"
-              android:viewportHeight="24">
-              <path
-                  android:fillColor="#FFFFFFFF"
-                  android:pathData="M19,2L5,2c-1.1,0 -2,0.9 -2,2v16c0,1.1 0.9,2 2,2h14c1.1,0 2,-0.9 2,-2L21,4c0,-1.1 -0.9,-2 -2,-2zM19,20L5,20L5,4h7v7l2.5,-1.5L17,11L17,4h2v16z"/>
-          </vector>
-          EOF
-
-          cat << 'EOF' > app/src/main/res/drawable/ic_play.xml
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="24dp"
-              android:height="24dp"
-              android:viewportWidth="24"
-              android:viewportHeight="24">
-              <path
-                  android:fillColor="#FFFFFFFF"
-                  android:pathData="M8,5v14l11,-7z"/>
-          </vector>
-          EOF
-
-          cat << 'EOF' > app/src/main/res/drawable/ic_pause.xml
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="24dp"
-              android:height="24dp"
-              android:viewportWidth="24"
-              android:viewportHeight="24">
-              <path
-                  android:fillColor="#FFFFFFFF"
-                  android:pathData="M6,19h4L10,5L6,5v14zM14,5v14h4L18,5h-4z"/>
-          </vector>
-          EOF
-
-          cat << 'EOF' > app/src/main/res/drawable/ic_link.xml
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="24dp"
-              android:height="24dp"
-              android:viewportWidth="24"
-              android:viewportHeight="24">
-              <path
-                  android:fillColor="#FFFFFFFF"
-                  android:pathData="M3.9,12c0,-1.71 1.39,-3.1 3.1,-3.1h4V7H7c-2.76,0 -5,2.24 -5,5s2.24,5 5,5h4v-1.9H7c-1.71,0 -3.1,-1.39 -3.1,-3.1zM8,13h8v-2H8v2zm9,-6h-4v1.9h4c1.71,0 3.1,1.39 3.1,3.1s-1.39,3.1 -3.1,3.1h-4V17h4c2.76,0 5,-2.24 5,-5s-2.24,-5 -5,-5z"/>
-          </vector>
-          EOF
-
-      - name: Commit and Push Missing Assets
+      - name: Build Android APK
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add app/src/main/res/
-          if ! git diff --staged --quiet; then
-            git commit -m "Fix: Add missing ic_download, ic_more_vert and theme_compat [skip ci]"
-            git push origin HEAD:${{ github.ref_name }}
-          else
-            echo "All assets already present."
-          fi
+          chmod +x gradlew
+          BUILD_TASK="${{ inputs.build_type || 'assembleRelease' }}"
+          ./gradlew ":${{ env.main_project_module }}:${BUILD_TASK}" \
+            -Dorg.gradle.jvmargs="-Xmx4096m -XX:+UseParallelGC" \
+            --stacktrace --warning-mode none
+
+      - name: Collect Output APKs
+        if: success()
+        run: |
+          mkdir -p build_output_apks
+          find . -type f -name "*.apk" -not -path "*/intermediates/*" -exec cp {} build_output_apks/ \;
+          echo "Collected APK files:"
+          ls -lh build_output_apks/
+
+      - name: Upload APKs Artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: App-Release-Builds
+          path: build_output_apks/
+          if-no-files-found: error
