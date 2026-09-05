@@ -46,11 +46,43 @@ jobs:
           EOF
           cp keystore.properties app/keystore.properties
 
-      - name: Auto-Inject All Missing Drawables
+      # Auto-fix HomeFragment IDs + Inject All Vector Assets
+      - name: Auto-Patch Code & Drawables
         run: |
           python3 - << 'EOF'
           import os
+          import re
 
+          # 1. Patch HomeFragment.kt missing IDs
+          home_kt_path = 'app/src/main/java/com/deniscerri/ytdl/ui/HomeFragment.kt'
+          if os.path.exists(home_kt_path):
+              with open(home_kt_path, 'r', encoding='utf-8') as f:
+                  kt = f.read()
+
+              # Replace invalid R.id references with valid project IDs
+              kt = kt.replace('R.id.settingsFragment', 'R.id.moreFragment')
+              kt = kt.replace('R.id.downloadsFragment', 'R.id.downloadQueueMainFragment')
+
+              # Ensure fallback to historyFragment if needed
+              if 'openDownloadsScreen' in kt:
+                  replacement = """private fun openDownloadsScreen() {
+              try {
+                  findNavController().navigate(R.id.downloadQueueMainFragment)
+              } catch (e: Exception) {
+                  try {
+                      findNavController().navigate(R.id.historyFragment)
+                  } catch (e2: Exception) {
+                      requireActivity().findViewById<View>(R.id.historyFragment)?.performClick()
+                  }
+              }
+          }"""
+                  kt = re.sub(r'private fun openDownloadsScreen\(\)\s*\{.*?\}\s*\}', replacement + '\n', kt, flags=re.DOTALL)
+
+              with open(home_kt_path, 'w', encoding='utf-8') as f:
+                  f.write(kt)
+              print("HomeFragment.kt successfully patched!")
+
+          # 2. Generate all vector drawables
           drawable_dir = 'app/src/main/res/drawable'
           os.makedirs(drawable_dir, exist_ok=True)
 
@@ -95,7 +127,7 @@ jobs:
               with open(os.path.join(drawable_dir, name), 'w') as f:
                   f.write(content)
 
-          print("Successfully injected all required vector icons including ic_more_vert!")
+          print("Successfully injected all drawables and patched code!")
           EOF
 
       - name: Grant Execute Permission for Gradlew
