@@ -1,6 +1,5 @@
 package com.deniscerri.ytdl.ui.more
 import android.widget.TextView
-import com.deniscerri.ytdl.ui.quran.QuranActivity
 
 import android.content.Intent
 import android.content.SharedPreferences
@@ -69,10 +68,6 @@ class MoreFragment : Fragment() {
                         cookies = view.findViewById(R.id.cookies)
         observeSources = view.findViewById(R.id.observe_sources)
         terminateApp = view.findViewById(R.id.terminate)
-        
-        view.findViewById<android.widget.TextView>(R.id.quran_app)?.setOnClickListener {
-            startActivity(android.content.Intent(requireContext(), QuranActivity::class.java))
-        }
         
         settings = view.findViewById(R.id.settings)
         aboutApp = view.findViewById(R.id.about_app)
@@ -178,7 +173,7 @@ class MoreFragment : Fragment() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_about_app, null)
         val textAbout = dialogView.findViewById<TextView>(R.id.text_about)
         
-        val aboutText = "<b>Kupido player 2 Beta</b><br><br>" +
+        val aboutText = "<b>K2App</b><br><br>" +
                 "Developed by NoishiXzen, for more tools or apps follow <a href=\"https://aivorygen.netlify.app\">aivorygen.netlify.app</a><br><br>" +
                 "<b>Github:</b> <a href=\"https://github.com/pushpajit-dev\">https://github.com/pushpajit-dev</a><br>" +
                 "<b>Discord:</b> NoishiXzen<br>" +

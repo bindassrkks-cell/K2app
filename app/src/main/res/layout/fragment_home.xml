@@ -48,7 +48,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="10dp"
-                    android:text="Al-SHOW  BÉTÆ"
+                    android:text="K2App"
                     android:textColor="#FFFFFF"
                     android:textSize="20sp"
                     android:textStyle="bold" />
@@ -92,70 +92,6 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
-
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/pill_history"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="8dp"
-                    app:cardCornerRadius="18dp"
-                    app:cardBackgroundColor="#1B2B23"
-                    app:strokeColor="#00E676"
-                    app:strokeWidth="1dp"
-                    android:clickable="true"
-                    android:focusable="true">
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:paddingHorizontal="14dp">
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/ic_history"
-                            app:tint="#00E676" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:text="Islamic Stream"
-                            android:textColor="#00E676"
-                            android:textStyle="bold"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/pill_quran"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="8dp"
-                    app:cardCornerRadius="18dp"
-                    app:cardBackgroundColor="#16181F"
-                    app:strokeColor="#00E676"
-                    app:strokeWidth="1dp"
-                    android:clickable="true"
-                    android:focusable="true">
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:paddingHorizontal="14dp">
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/ic_quran"
-                            app:tint="#00E676" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:text="Al-Quran"
-                            android:textColor="#FFFFFF"
-                            android:textStyle="bold"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
 
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/pill_input_url"
@@ -215,7 +151,7 @@
             android:layout_height="46dp"
             android:layout_marginHorizontal="14dp"
             android:layout_marginBottom="10dp"
-            android:hint="Search Quran recitations or paste link..."
+            android:hint="Search or paste a media URL"
             app:backgroundTint="#16181F"
             android:elevation="1dp" />
 
@@ -338,7 +274,7 @@
         android:id="@+id/search_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:hint="Search Quran recitations..."
+        android:hint="Search or paste a media URL"
         app:layout_anchor="@id/search_bar">
 
         <LinearLayout

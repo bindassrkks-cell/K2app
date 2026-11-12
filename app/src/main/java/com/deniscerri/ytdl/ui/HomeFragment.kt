@@ -61,7 +61,6 @@ import com.deniscerri.ytdl.database.viewmodel.ResultViewModel
 import com.deniscerri.ytdl.ui.adapter.HomeAdapter
 import com.deniscerri.ytdl.ui.adapter.SearchSuggestionsAdapter
 import com.deniscerri.ytdl.ui.more.cookies.WebViewActivity
-import com.deniscerri.ytdl.ui.quran.QuranActivity
 import com.deniscerri.ytdl.util.Extensions.enableFastScroll
 import com.deniscerri.ytdl.util.Extensions.isURL
 import com.deniscerri.ytdl.util.NotificationUtil
@@ -84,8 +83,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import java.net.URL
 
 class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggestionsAdapter.OnItemClickListener, OnClickListener {
     private var inputQueries: MutableList<String>? = null
@@ -183,37 +180,22 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
         playlistNameFilterChipGroup = view.findViewById(R.id.playlist_selection_chips)
         shimmerCards = view.findViewById(R.id.shimmer_results_framelayout)
 
-        // ==========================================
-        // CONNECTED FEATURES & ACTION PILLS
-        // ==========================================
-
-        // 1. Al-Quran Feature Pill
-        view.findViewById<View>(R.id.pill_quran)?.setOnClickListener {
-            startActivity(Intent(requireContext(), QuranActivity::class.java))
-        }
-
-        // 2. Islamic Stream / Feed Pill
-        view.findViewById<View>(R.id.pill_history)?.setOnClickListener {
-            loadIslamicHomeContent()
-            Toast.makeText(context, "Streaming Islamic Feed...", Toast.LENGTH_SHORT).show()
-        }
-
-        // 3. Settings Icon
+        // Primary actions
         view.findViewById<ImageView>(R.id.btn_settings)?.setOnClickListener {
             openSettingsScreen()
         }
 
-        // 4. Quick Search Icon
+        // Quick search
         view.findViewById<ImageView>(R.id.btn_quick_search)?.setOnClickListener {
             searchBar?.performClick()
         }
 
-        // 5. Category Pill: Downloads
+        // Downloads shortcut
         view.findViewById<View>(R.id.pill_downloads)?.setOnClickListener {
             openDownloadsScreen()
         }
 
-        // 6. Category Pill: Paste URL / Input Dialog
+        // Paste a URL
         view.findViewById<View>(R.id.pill_input_url)?.setOnClickListener {
             showDirectUrlInputDialog()
         }
@@ -221,7 +203,7 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
         // Recycler View Setup
         homeAdapter = HomeAdapter(this, requireActivity())
         recyclerView = view.findViewById(R.id.recyclerViewHome)
-        recyclerView?.layoutManager = GridLayoutManager(context, resources.getInteger(R.integer.grid_size))
+        recyclerView?.layoutManager = GridLayoutManager(context, responsiveHomeSpanCount())
         recyclerView?.adapter = homeAdapter
         recyclerView?.enableFastScroll()
 
@@ -389,33 +371,13 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
         }
     }
 
-    // ==========================================
-    // ISLAMIC CONTENT LOADER
-    // ==========================================
-    private fun loadIslamicHomeContent() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val jsonUrl = "https://raw.githubusercontent.com/Bindassrkks/K2app/main/data.json"
-                val text = URL(jsonUrl).readText()
-                val jsonArray = JSONArray(text)
-                val urls = mutableListOf<String>()
-                for (i in 0 until jsonArray.length()) {
-                    val obj = jsonArray.getJSONObject(i)
-                    val url = obj.optString("url")
-                    if (url.isNotEmpty()) urls.add(url)
-                }
-
-                if (urls.isNotEmpty()) {
-                    withContext(Dispatchers.Main) {
-                        resultViewModel.deleteAll()
-                        resultViewModel.parseQueries(urls) {}
-                    }
-                } else {
-                    withContext(Dispatchers.Main) { resultViewModel.checkTrending() }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) { resultViewModel.checkTrending() }
-            }
+    private fun responsiveHomeSpanCount(): Int {
+        val widthDp = resources.configuration.screenWidthDp
+        return when {
+            widthDp >= 840 -> 4
+            widthDp >= 600 -> 3
+            widthDp >= 420 -> 2
+            else -> resources.getInteger(R.integer.grid_size)
         }
     }
 

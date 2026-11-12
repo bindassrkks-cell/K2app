@@ -110,6 +110,14 @@
             android:title="@string/use_original_url_playlist" />
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/telegram_bot">
+        <Preference
+            android:icon="@drawable/ic_link"
+            android:key="telegram_bot_settings"
+            android:summary="@string/telegram_bot_settings_summary"
+            android:title="@string/telegram_bot_settings" />
+    </PreferenceCategory>
+
     <Preference
         app:allowDividerAbove="true"
         app:icon="@drawable/baseline_reset_tv_24"
