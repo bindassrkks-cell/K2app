@@ -35,6 +35,8 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     val statusFilter = MutableStateFlow(HistoryStatus.ALL)
     private val queryFilter = MutableStateFlow("")
     private val typeFilter = MutableStateFlow("")
+    val selectedTypeFilter: String
+        get() = typeFilter.value
 
     var filterCount : StateFlow<Int> = combine(
         websiteFilter,

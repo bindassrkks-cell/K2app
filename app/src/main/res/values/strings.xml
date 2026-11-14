@@ -1,5 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">K2App</string>
+    <string name="telegram_bot">Telegram bot</string>
+    <string name="telegram_bot_settings">Telegram bot connection</string>
+    <string name="telegram_bot_settings_summary">Save a bot token and chat ID, then receive media URLs from that chat</string>
+    <string name="telegram_bot_setup_help">Create a bot with Telegram BotFather, open it in Telegram and send /start, then enter its token and numeric chat ID (use a trusted Telegram chat-ID helper if needed). For a group, add the bot there; group IDs are often negative. Only URLs from the configured chat are accepted. The token is encrypted on this device.</string>
+    <string name="telegram_bot_token">Bot token</string>
+    <string name="telegram_chat_id">Chat ID</string>
+    <string name="telegram_connect_start">Test and start</string>
+    <string name="telegram_disconnect">Disconnect</string>
+    <string name="telegram_polling_status">Polling is active while the persistent notification is shown. Android may stop long-running background services.</string>
+    <string name="telegram_credentials_saved">Bot credentials are saved. Tap Test and start to run polling.</string>
+    <string name="telegram_token_required">Enter a valid Telegram bot token.</string>
+    <string name="telegram_chat_id_required">Enter a numeric Telegram chat ID.</string>
+    <string name="telegram_connecting">Checking the bot and starting polling…</string>
+    <string name="telegram_connect_success">Connected to @%1$s. Send a media URL to this bot in the configured chat.</string>
+    <string name="telegram_disconnect_success">Telegram bot disconnected.</string>
+    <string name="telegram_connection_failed">Could not connect: %1$s</string>
+    <string name="telegram_service_channel">Telegram bot service</string>
+    <string name="telegram_service_notification">Telegram polling is active</string>
+    <string name="telegram_stop_polling">Stop polling</string>
+    <string name="telegram_service_stopped">Telegram polling stopped</string>
+    <string name="telegram_service_limit_reached">Android paused Telegram polling. Reopen K2App settings to start it again.</string>
+    <string name="telegram_url_queued">URL added to the K2App download queue.</string>
+    <string name="telegram_url_failed">Could not fetch or queue that URL.</string>
+    <string name="telegram_help_message">Send a media URL in this chat to fetch its details and add it to K2App downloads.</string>
     <string name="worst_quality">Worst quality</string>
     <string name="best_quality">Best quality</string>
     <string name="search">Search</string>
