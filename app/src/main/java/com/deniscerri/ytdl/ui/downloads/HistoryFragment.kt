@@ -443,32 +443,58 @@ class HistoryFragment : Fragment(), HistoryPaginatedAdapter.OnItemClickListener{
         }
 
         //format
+        val all = fragmentView.findViewById<Chip>(R.id.all_chip)
         val audio = fragmentView.findViewById<Chip>(R.id.audio_chip)
+        val video = fragmentView.findViewById<Chip>(R.id.video_chip)
+        val command = fragmentView.findViewById<Chip>(R.id.command_chip)
+        when (historyViewModel.selectedTypeFilter) {
+            DownloadType.audio.toString() -> audio.isChecked = true
+            DownloadType.video.toString() -> video.isChecked = true
+            DownloadType.command.toString() -> command.isChecked = true
+            else -> all.isChecked = true
+        }
+        all.setOnClickListener {
+            all.isChecked = true
+            audio.isChecked = false
+            video.isChecked = false
+            command.isChecked = false
+            historyViewModel.setTypeFilter("")
+        }
         audio.setOnClickListener {
             if (audio.isChecked) {
+                all.isChecked = false
+                video.isChecked = false
+                command.isChecked = false
                 historyViewModel.setTypeFilter(DownloadType.audio.toString())
                 audio.isChecked = true
             } else {
+                all.isChecked = true
                 historyViewModel.setTypeFilter("")
                 audio.isChecked = false
             }
         }
-        val video = fragmentView.findViewById<Chip>(R.id.video_chip)
         video.setOnClickListener {
             if (video.isChecked) {
+                all.isChecked = false
+                audio.isChecked = false
+                command.isChecked = false
                 historyViewModel.setTypeFilter(DownloadType.video.toString())
                 video.isChecked = true
             } else {
+                all.isChecked = true
                 historyViewModel.setTypeFilter("")
                 video.isChecked = false
             }
         }
-        val command = fragmentView.findViewById<Chip>(R.id.command_chip)
         command.setOnClickListener {
             if (command.isChecked) {
+                all.isChecked = false
+                audio.isChecked = false
+                video.isChecked = false
                 historyViewModel.setTypeFilter(DownloadType.command.toString())
                 command.isChecked = true
             } else {
+                all.isChecked = true
                 historyViewModel.setTypeFilter("")
                 command.isChecked = false
             }

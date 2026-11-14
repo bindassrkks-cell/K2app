@@ -4,9 +4,9 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/k2_ui_background"
     android:fitsSystemWindows="true"
     tools:context=".MainActivity">
-
     <TextView
         android:id="@+id/incognito_header"
         android:layout_width="match_parent"
@@ -16,20 +16,19 @@
         android:textStyle="bold"
         android:translationZ="20dp"
         android:visibility="gone"
-        android:padding="5dp"
+        android:padding="8dp"
         android:background="?colorPrimaryContainer"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="0dp"
         android:layout_height="0dp"
+        android:background="@color/k2_ui_background"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/incognito_header">
-
         <androidx.fragment.app.FragmentContainerView
             android:id="@+id/frame_layout"
             android:name="androidx.navigation.fragment.NavHostFragment"
@@ -40,9 +39,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@+id/navigationView"
-            app:layout_constraintTop_toTopOf="parent"
-            />
-
+            app:layout_constraintTop_toTopOf="parent" />
         <LinearLayout
             android:id="@+id/notification_container"
             android:layout_width="0dp"
@@ -56,11 +53,15 @@
             android:layout_marginBottom="20dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toEndOf="@id/navigationView" />
-
         <com.google.android.material.navigation.NavigationView
             android:id="@+id/navigationView"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
+            android:background="@color/k2_ui_surface"
+            android:elevation="8dp"
+            app:itemIconTint="@color/k2_ui_navigation_tint"
+            app:itemRippleColor="@color/k2_ui_accent_container"
+            app:itemTextColor="@color/k2_ui_navigation_tint"
             app:labelVisibilityMode="unlabeled"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
@@ -69,8 +70,5 @@
             app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/nav_menu_largescreen" />
-
-
     </androidx.constraintlayout.widget.ConstraintLayout>
-
 </androidx.constraintlayout.widget.ConstraintLayout>

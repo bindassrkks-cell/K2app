@@ -110,7 +110,7 @@
             android:title="@string/use_original_url_playlist" />
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="@string/telegram_bot">
+    <PreferenceCategory android:title="Integrations">
         <Preference
             android:icon="@drawable/ic_link"
             android:key="telegram_bot_settings"

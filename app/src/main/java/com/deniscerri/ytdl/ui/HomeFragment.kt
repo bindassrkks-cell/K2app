@@ -114,6 +114,7 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
     private var fragmentContext: Context? = null
     private var layoutinflater: LayoutInflater? = null
     private var shimmerCards: ShimmerFrameLayout? = null
+    private var emptyState: View? = null
     private var searchBar: SearchBar? = null
     private var searchView: SearchView? = null
     private var providersChipGroup: ChipGroup? = null
@@ -180,6 +181,13 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
         playlistNameFilterScrollView = view.findViewById(R.id.playlist_selection_chips_scrollview)
         playlistNameFilterChipGroup = view.findViewById(R.id.playlist_selection_chips)
         shimmerCards = view.findViewById(R.id.shimmer_results_framelayout)
+        emptyState = view.findViewById(R.id.home_empty_state)
+        view.findViewById<View>(R.id.home_empty_paste)?.setOnClickListener {
+            showDirectUrlInputDialog()
+        }
+        view.findViewById<View>(R.id.home_empty_search)?.setOnClickListener {
+            searchBar?.performClick()
+        }
 
         // Primary actions
         view.findViewById<ImageView>(R.id.btn_settings)?.setOnClickListener {
@@ -229,6 +237,7 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
                 val firstResult = resultViewModel.firstResult.value
 
                 progressBar.isVisible = loadingItems && size > 0
+                updateHomeState(size)
                 if (resultViewModel.repository.itemCount.value > 1 || resultViewModel.repository.itemCount.value == -1) {
                     showDownloadAllFab = size > 1 && firstResult?.playlistTitle?.isNotEmpty() == true && !loadingItems
                     downloadAllFab?.isVisible = showDownloadAllFab
@@ -343,6 +352,7 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
 
                 loadingItems = res.processing
                 progressBar.isVisible = loadingItems && totalCount > 0
+                updateHomeState(totalCount)
                 if (res.processing) {
                     recyclerView?.setPadding(0, 0, 0, 0)
                     shimmerCards?.startShimmer()
@@ -372,6 +382,9 @@ class HomeFragment : Fragment(), HomeAdapter.OnItemClickListener, SearchSuggesti
         }
     }
 
+    private fun updateHomeState(count: Int) {
+        emptyState?.isVisible = !loadingItems && count == 0
+    }
     private fun responsiveHomeSpanCount(): Int {
         val widthDp = resources.configuration.screenWidthDp
         return when {

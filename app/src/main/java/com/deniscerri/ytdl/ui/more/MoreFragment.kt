@@ -128,6 +128,9 @@ class MoreFragment : Fragment() {
             val intent = Intent(context, SettingsActivity::class.java)
             startActivity(intent)
         }
+        view.findViewById<View>(R.id.settings_card)?.setOnClickListener {
+            settings.performClick()
+        }
 
     }
 
