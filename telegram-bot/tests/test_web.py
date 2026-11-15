@@ -57,7 +57,7 @@ class WebhookTests(unittest.TestCase):
         method, payload = FakeApi.calls[-1]
         self.assertEqual(method, "setWebhook")
         self.assertEqual(payload["url"], "https://k2app.example.com/telegram/webhook")
-        self.assertEqual(payload["allowed_updates"], ["message"])
+        self.assertEqual(payload["allowed_updates"], ["message", "callback_query"])
         self.assertEqual(payload["max_connections"], 1)
         self.assertFalse(payload["drop_pending_updates"])
         self.assertEqual(payload["secret_token"], "test-secret-1234567890")
@@ -80,6 +80,18 @@ class WebhookTests(unittest.TestCase):
         duplicate = self.client.post("/telegram/webhook", json=update, headers=headers)
         self.assertEqual(duplicate.status_code, 200)
 
+    def test_inline_callback_update_is_accepted(self):
+        update = {
+            "update_id": 43,
+            "callback_query": {
+                "id": "callback-1", "data": "k2:abc_123:0",
+                "message": {"chat": {"id": int(OWNER), "type": "private"}},
+            },
+        }
+        headers = {"X-Telegram-Bot-Api-Secret-Token": "test-secret-1234567890"}
+        self.assertTrue(web._valid_update(update))
+        self.assertEqual(self.client.post("/telegram/webhook", json=update, headers=headers).status_code, 200)
+
     def test_malformed_updates_and_oversized_content_are_rejected(self):
         headers = {"X-Telegram-Bot-Api-Secret-Token": "test-secret-1234567890"}
         self.assertEqual(self.client.post("/telegram/webhook", content=b"{", headers=headers).status_code, 400)
@@ -91,6 +103,66 @@ class WebhookTests(unittest.TestCase):
         headers = {"X-Telegram-Bot-Api-Secret-Token": "test-secret-1234567890", "Transfer-Encoding": "chunked"}
         response = self.client.post("/telegram/webhook", content=(b" " * 32 for _ in range(web.MAX_BODY_BYTES // 32 + 1)), headers=headers)
         self.assertEqual(response.status_code, 413)
+
+    def test_lite_api_requires_bearer_token(self):
+        response = self.client.post("/api/v1/jobs", json={"url": "https://example.com/video"})
+        self.assertEqual(response.status_code, 401)
+
+    def test_lite_pairing_code_is_one_use_and_issues_bearer_token(self):
+        state = self.client.app.state.bot_state
+        code = state.create_api_pair_code(OWNER)
+        response = self.client.post("/api/v1/auth/pair", json={"code": code})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        token = response.json()["access_token"]
+        self.assertTrue(token)
+        self.assertEqual(state.authenticate_api_token(token), OWNER)
+        reused = self.client.post("/api/v1/auth/pair", json={"code": code})
+        self.assertEqual(reused.status_code, 401)
+
+    def test_lite_api_resolves_job_and_returns_chooser_link_and_status(self):
+        async def resolve(_url):
+            return {
+                "title": "Example clip", "duration_seconds": 42,
+                "thumbnail_url": "https://cdn.example/preview.jpg",
+                "choices": [{"kind": "video", "label": "MP4 · 720p", "format_selector": "v1+a1", "height": 720}],
+            }
+
+        code = self.client.app.state.bot_state.create_api_pair_code(OWNER)
+        token = self.client.post("/api/v1/auth/pair", json={"code": code}).json()["access_token"]
+        with patch.object(web, "_resolve_media_with_deadline", resolve):
+            response = self.client.post(
+                "/api/v1/jobs", json={"url": "https://example.com/video"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            self.assertEqual(response.status_code, 202)
+            data = response.json()
+            self.assertEqual(data["status"], "chooser_ready")
+            self.assertEqual(data["media"]["title"], "Example clip")
+            self.assertEqual(data["chooser_url"], f"https://t.me/k2app_test_bot?start=dl_{data['job_id']}")
+            status = self.client.get(
+                f"/api/v1/jobs/{data['job_id']}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            self.assertEqual(status.status_code, 200)
+            self.assertEqual(status.json()["status"], "chooser_ready")
+
+    def test_lite_choose_returns_busy_without_consuming_job(self):
+        state = self.client.app.state.bot_state
+        media = {
+            "url": "https://example.com/video", "title": "Example",
+            "choices": [{"kind": "video", "label": "MP4 · 720p", "format_selector": "v1+a1", "height": 720}],
+        }
+        job_id = state.save_media_choices(OWNER, media)
+        code = state.create_api_pair_code(OWNER)
+        token = self.client.post("/api/v1/auth/pair", json={"code": code}).json()["access_token"]
+        with patch.object(self.client.app.state.bot, "has_active_download", return_value=True):
+            response = self.client.post(
+                f"/api/v1/jobs/{job_id}/choose", json={"choice_index": 0},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        self.assertEqual(response.status_code, 429)
+        self.assertIsNotNone(state.get_media_choices(job_id, OWNER))
 
     def test_completed_payload_is_wiped_and_done_history_bounded(self):
         store = self.client.app.state.store

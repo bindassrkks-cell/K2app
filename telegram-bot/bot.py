@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import hmac
 import ipaddress
+import json
 import logging
 import mimetypes
 import multiprocessing
 import os
 import re
+import secrets
 import sqlite3
 import socket
 import tempfile
-from collections.abc import Generator
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,8 +35,6 @@ EXCLUDED_SUFFIXES = {
     ".webp", ".vtt", ".srt", ".ass", ".lrc", ".temp",
 }
 DOWNLOAD_TIMEOUT_SECONDS = 270
-UPLOAD_PART_BYTES = 49_000_000
-PART_COPY_BLOCK_BYTES = 1024 * 1024
 
 
 class ConfigurationError(ValueError):
@@ -164,6 +165,18 @@ class BotState:
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS bot_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
             )
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS media_choices (token TEXT PRIMARY KEY, chat_id TEXT NOT NULL, "
+                "media_json TEXT NOT NULL, expires_at INTEGER NOT NULL, consumed INTEGER NOT NULL DEFAULT 0, "
+                "status TEXT NOT NULL DEFAULT 'chooser_ready', progress INTEGER NOT NULL DEFAULT 0, "
+                "status_text TEXT NOT NULL DEFAULT '')"
+            )
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS api_pair_codes (code_hash TEXT PRIMARY KEY, chat_id TEXT NOT NULL, expires_at INTEGER NOT NULL)"
+            )
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS api_access_tokens (token_hash TEXT PRIMARY KEY, chat_id TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)"
+            )
             connection.commit()
         finally:
             connection.close()
@@ -224,6 +237,136 @@ class BotState:
         finally:
             connection.close()
 
+    def create_api_pair_code(self, chat_id: str, ttl_seconds: int = 300) -> str:
+        code = secrets.token_urlsafe(8)
+        code_hash = hashlib.sha256(code.encode()).hexdigest()
+        now = int(time.time())
+        connection = self._connect()
+        try:
+            with connection:
+                connection.execute("DELETE FROM api_pair_codes WHERE expires_at < ?", (now,))
+                connection.execute(
+                    "INSERT INTO api_pair_codes(code_hash,chat_id,expires_at) VALUES(?,?,?)",
+                    (code_hash, str(chat_id), now + ttl_seconds),
+                )
+            return code
+        finally:
+            connection.close()
+
+    def exchange_api_pair_code(self, code: str) -> tuple[str, str] | None:
+        code_hash = hashlib.sha256(code.encode()).hexdigest()
+        now = int(time.time())
+        token = secrets.token_urlsafe(32)
+        connection = self._connect()
+        try:
+            with connection:
+                row = connection.execute(
+                    "SELECT chat_id FROM api_pair_codes WHERE code_hash=? AND expires_at>=?",
+                    (code_hash, now),
+                ).fetchone()
+                if row is None:
+                    return None
+                chat_id = str(row[0])
+                connection.execute("DELETE FROM api_pair_codes WHERE code_hash=?", (code_hash,))
+                connection.execute(
+                    "INSERT INTO api_access_tokens(token_hash,chat_id,created_at,expires_at) VALUES(?,?,?,?)",
+                    (hashlib.sha256(token.encode()).hexdigest(), chat_id, now, now + 90 * 86400),
+                )
+                return chat_id, token
+        finally:
+            connection.close()
+
+    def authenticate_api_token(self, token: str) -> str | None:
+        digest = hashlib.sha256(token.encode()).hexdigest()
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                "SELECT chat_id FROM api_access_tokens WHERE token_hash=? AND expires_at>=?",
+                (digest, int(time.time())),
+            ).fetchone()
+            return str(row[0]) if row else None
+        finally:
+            connection.close()
+
+    def save_media_choices(self, chat_id: str, media: dict, ttl_seconds: int = 1800) -> str:
+        token = secrets.token_urlsafe(8)
+        now = int(time.time())
+        connection = self._connect()
+        try:
+            with connection:
+                connection.execute("DELETE FROM media_choices WHERE expires_at < ? OR consumed = 1", (now,))
+                connection.execute(
+                    "INSERT INTO media_choices(token,chat_id,media_json,expires_at,consumed,status,progress,status_text) "
+                    "VALUES(?,?,?,?,0,'chooser_ready',0,'')",
+                    (token, str(chat_id), json.dumps(media, separators=(",", ":")), now + ttl_seconds),
+                )
+            return token
+        finally:
+            connection.close()
+
+    def get_media_choices(self, token: str, chat_id: str) -> dict | None:
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                "SELECT media_json FROM media_choices WHERE token=? AND chat_id=? AND expires_at>=?",
+                (token, str(chat_id), int(time.time())),
+            ).fetchone()
+            return json.loads(row[0]) if row else None
+        finally:
+            connection.close()
+
+    def media_job_status(self, token: str, chat_id: str) -> dict | None:
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                "SELECT status,progress,status_text,expires_at FROM media_choices "
+                "WHERE token=? AND chat_id=? AND expires_at>=?",
+                (token, str(chat_id), int(time.time())),
+            ).fetchone()
+            if row is None:
+                return None
+            return {"status": row[0], "progress": row[1], "status_text": row[2], "expires_at": row[3]}
+        finally:
+            connection.close()
+
+    def set_media_job_status(self, token: str, status: str, progress: int = 0, text: str = "") -> None:
+        connection = self._connect()
+        try:
+            with connection:
+                connection.execute(
+                    "UPDATE media_choices SET status=?,progress=?,status_text=? WHERE token=?",
+                    (str(status)[:40], max(0, min(100, int(progress))), str(text)[:120], token),
+                )
+        finally:
+            connection.close()
+
+    def consume_media_choice(self, token: str, chat_id: str, choice_index: int) -> tuple[dict, dict] | None:
+        now = int(time.time())
+        connection = self._connect()
+        try:
+            with connection:
+                row = connection.execute(
+                    "SELECT media_json FROM media_choices WHERE token=? AND chat_id=? "
+                    "AND expires_at>=? AND consumed=0",
+                    (token, str(chat_id), now),
+                ).fetchone()
+                if row is None:
+                    return None
+                media = json.loads(row[0])
+                choices = media.get("choices", [])
+                if not isinstance(choice_index, int) or not 0 <= choice_index < len(choices):
+                    return None
+                updated = connection.execute(
+                    "UPDATE media_choices SET consumed=1,status='queued',progress=0,status_text='Queued' "
+                    "WHERE token=? AND chat_id=? AND consumed=0",
+                    (token, str(chat_id)),
+                )
+                if updated.rowcount != 1:
+                    return None
+                return media, choices[choice_index]
+        finally:
+            connection.close()
+
 
 class TelegramApi:
     def __init__(self, token: str, base_url: str):
@@ -263,18 +406,44 @@ class TelegramApi:
             )
         return result.get("result")
 
-    async def send_message(self, chat_id: str, text: str) -> None:
-        await self.call("sendMessage", {"chat_id": chat_id, "text": text})
+    async def send_message(self, chat_id: str, text: str, reply_markup: dict | None = None):
+        payload = {"chat_id": chat_id, "text": text}
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+        return await self.call("sendMessage", payload)
+
+    async def edit_message_text(self, chat_id: str, message_id: int, text: str,
+                                reply_markup: dict | None = None):
+        payload = {"chat_id": chat_id, "message_id": message_id, "text": text}
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+        return await self.call("editMessageText", payload)
+
+    async def answer_callback_query(self, callback_query_id: str, text: str = "") -> None:
+        payload = {"callback_query_id": callback_query_id}
+        if text:
+            payload["text"] = text[:180]
+        await self.call("answerCallbackQuery", payload)
+
+    async def send_photo_url(self, chat_id: str, photo_url: str, caption: str = ""):
+        return await self.call("sendPhoto", {
+            "chat_id": chat_id, "photo": photo_url, "caption": caption[:900],
+        })
 
     async def send_media(self, chat_id: str, path: Path, mode: str) -> None:
-        method = "sendAudio" if mode == "audio" else "sendDocument"
-        field = "audio" if mode == "audio" else "document"
+        if path.suffix.lower() == ".mp4":
+            method, field = "sendVideo", "video"
+            extra = {"supports_streaming": True}
+        elif path.suffix.lower() == ".mp3":
+            method, field, extra = "sendAudio", "audio", {}
+        else:
+            method, field, extra = "sendDocument", "document", {}
         mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         upload_timeout = httpx.Timeout(240.0, connect=20.0)
         with path.open("rb") as media_file:
             await self.call(
                 method,
-                {"chat_id": chat_id, "caption": path.name[:900]},
+                {"chat_id": chat_id, "caption": path.name[:900], **extra},
                 files={field: (path.name, media_file, mime_type)},
                 timeout=upload_timeout,
             )
@@ -349,30 +518,15 @@ def extract_urls(text: str) -> list[str]:
     return urls[:MAX_URLS_PER_MESSAGE]
 
 
-def split_file(path: Path, work_dir: Path, chunk_bytes: int = UPLOAD_PART_BYTES) -> Generator[Path, None, None]:
-    """Yield numbered chunks one at a time without loading or duplicating the whole file."""
-    if chunk_bytes <= 0:
-        raise ValueError("chunk_bytes must be positive")
-    total = path.stat().st_size
-    count = (total + chunk_bytes - 1) // chunk_bytes
-    with path.open("rb") as source:
-        for index in range(1, count + 1):
-            part = work_dir / f"{path.name}.part{index:03d}"
-            remaining = min(chunk_bytes, total - (index - 1) * chunk_bytes)
-            with part.open("wb") as target:
-                while remaining:
-                    block = source.read(min(PART_COPY_BLOCK_BYTES, remaining))
-                    if not block:
-                        raise OSError("Source file ended while splitting")
-                    target.write(block)
-                    remaining -= len(block)
-            try:
-                yield part
-            finally:
-                part.unlink(missing_ok=True)
-
-
-def _download_media(url: str, work_dir: Path, mode: str, max_bytes: int) -> tuple[Path, str]:
+def _download_media(
+    url: str,
+    work_dir: Path,
+    mode: str,
+    max_bytes: int,
+    format_selector: str | None = None,
+    audio_quality: int = 192,
+    progress_conn=None,
+) -> tuple[Path, str]:
     try:
         from yt_dlp import YoutubeDL
         from yt_dlp.utils import DownloadError
@@ -380,7 +534,7 @@ def _download_media(url: str, work_dir: Path, mode: str, max_bytes: int) -> tupl
         raise RuntimeError("yt-dlp is not installed") from error
 
     options = {
-        "format": "bestaudio/best" if mode == "audio" else "bestvideo*+bestaudio/best",
+        "format": format_selector or ("bestaudio/best" if mode == "audio" else "bestvideo*+bestaudio/best"),
         "outtmpl": str(work_dir / "%(title).80B-%(id)s.%(ext)s"),
         "noplaylist": True,
         "max_filesize": max_bytes,
@@ -399,9 +553,21 @@ def _download_media(url: str, work_dir: Path, mode: str, max_bytes: int) -> tupl
             {
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
-                "preferredquality": "192",
+                "preferredquality": str(audio_quality),
             }
         ]
+    if progress_conn is not None:
+        def progress_hook(status):
+            try:
+                progress_conn.send((
+                    "progress",
+                    str(status.get("status") or "downloading"),
+                    int(status.get("downloaded_bytes") or 0),
+                    int(status.get("total_bytes") or status.get("total_bytes_estimate") or 0),
+                ))
+            except (BrokenPipeError, EOFError, OSError):
+                pass
+        options["progress_hooks"] = [progress_hook]
 
     try:
         with YoutubeDL(options) as downloader:
@@ -443,9 +609,19 @@ def _download_media(url: str, work_dir: Path, mode: str, max_bytes: int) -> tupl
     return media_path, str(info.get("title") or media_path.name)
 
 
-def _download_process_entry(send_conn, url: str, work_dir: str, mode: str, max_bytes: int) -> None:
+def _download_process_entry(
+    send_conn,
+    url: str,
+    work_dir: str,
+    mode: str,
+    max_bytes: int,
+    format_selector: str | None = None,
+    audio_quality: int = 192,
+) -> None:
     try:
-        path, title = _download_media(url, Path(work_dir), mode, max_bytes)
+        path, title = _download_media(
+            url, Path(work_dir), mode, max_bytes, format_selector, audio_quality, send_conn
+        )
         send_conn.send(("ok", str(path), title))
     except MediaTooLargeError as error:
         send_conn.send(("too_large", error.size_bytes, error.limit_bytes))
@@ -459,32 +635,62 @@ class DownloadTimeoutError(TimeoutError):
     pass
 
 
-async def _download_with_deadline(url: str, work_dir: Path, mode: str, max_bytes: int) -> tuple[Path, str]:
+async def _download_with_deadline(
+    url: str,
+    work_dir: Path,
+    mode: str,
+    max_bytes: int,
+    format_selector: str | None = None,
+    audio_quality: int = 192,
+    progress_callback=None,
+) -> tuple[Path, str]:
     """Run yt-dlp in a killable process; coroutine cancellation cannot orphan the downloader."""
     context = multiprocessing.get_context("spawn")
     receive_conn, send_conn = context.Pipe(duplex=False)
     process = context.Process(
         target=_download_process_entry,
-        args=(send_conn, url, str(work_dir), mode, max_bytes),
+        args=(send_conn, url, str(work_dir), mode, max_bytes, format_selector, audio_quality),
         daemon=True,
     )
     process.start()
     send_conn.close()
     try:
-        deadline = asyncio.get_running_loop().time() + DOWNLOAD_TIMEOUT_SECONDS
-        while process.is_alive() and asyncio.get_running_loop().time() < deadline:
-            await asyncio.sleep(0.1)
-        if process.is_alive():
-            process.terminate()
-            await asyncio.to_thread(process.join, 5)
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + DOWNLOAD_TIMEOUT_SECONDS
+        result = None
+        last_progress_time = 0.0
+        last_percent = -1
+        while process.is_alive() or receive_conn.poll():
+            while receive_conn.poll():
+                item = receive_conn.recv()
+                if item and item[0] == "progress":
+                    _kind, status, downloaded, total = item
+                    percent = min(100, int(downloaded * 100 / total)) if total else None
+                    now = loop.time()
+                    if progress_callback and (
+                        now - last_progress_time >= 3 or (percent is not None and percent >= last_percent + 5)
+                        or status == "finished"
+                    ):
+                        await progress_callback(status, downloaded, total, percent)
+                        last_progress_time = now
+                        if percent is not None:
+                            last_percent = percent
+                else:
+                    result = item
+            if loop.time() >= deadline and process.is_alive():
+                process.terminate()
+                await asyncio.to_thread(process.join, 5)
+                if process.is_alive():
+                    process.kill()
+                    await asyncio.to_thread(process.join)
+                raise DownloadTimeoutError("Media download exceeded its time limit")
             if process.is_alive():
-                process.kill()
-                await asyncio.to_thread(process.join)
-            raise DownloadTimeoutError("Media download exceeded its time limit")
+                await asyncio.sleep(0.1)
+            else:
+                break
         process.join()
-        if not receive_conn.poll():
+        if result is None:
             raise RuntimeError("Media downloader exited without a result")
-        result = receive_conn.recv()
         if result[0] == "ok":
             return Path(result[1]), result[2]
         if result[0] == "too_large":
@@ -502,11 +708,170 @@ async def _download_with_deadline(url: str, work_dir: Path, mode: str, max_bytes
         receive_conn.close()
 
 
+def _resolve_process_entry(send_conn, url: str) -> None:
+    try:
+        from media_catalog import resolve_media
+        send_conn.send(("ok", resolve_media(url)))
+    except BaseException as error:
+        send_conn.send(("error", type(error).__name__))
+    finally:
+        send_conn.close()
+
+
+async def _resolve_media_with_deadline(url: str, timeout_seconds: int = 90) -> dict:
+    context = multiprocessing.get_context("spawn")
+    receive_conn, send_conn = context.Pipe(duplex=False)
+    process = context.Process(target=_resolve_process_entry, args=(send_conn, url), daemon=True)
+    process.start()
+    send_conn.close()
+    try:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_seconds
+        result = None
+        while process.is_alive() or receive_conn.poll():
+            while receive_conn.poll():
+                result = receive_conn.recv()
+            if loop.time() >= deadline and process.is_alive():
+                process.terminate()
+                await asyncio.to_thread(process.join, 5)
+                if process.is_alive():
+                    process.kill()
+                    await asyncio.to_thread(process.join)
+                raise DownloadTimeoutError("Metadata lookup exceeded its time limit")
+            if process.is_alive():
+                await asyncio.sleep(0.1)
+            else:
+                break
+        process.join()
+        if result is None or result[0] != "ok":
+            raise RuntimeError("Media metadata lookup failed")
+        return result[1]
+    except asyncio.CancelledError:
+        if process.is_alive():
+            process.terminate()
+            await asyncio.to_thread(process.join, 5)
+            if process.is_alive():
+                process.kill()
+                await asyncio.to_thread(process.join)
+        raise
+    finally:
+        receive_conn.close()
+
+
+def _segment_process_entry(send_conn, input_path: str, output_dir: str, mode: str,
+                          profile: str, max_bytes: int, audio_bitrate: int) -> None:
+    try:
+        from media_segments import install_termination_handler, split_media
+        install_termination_handler()
+        outputs = split_media(
+            input_path, output_dir, mode=mode, profile=profile,
+            max_bytes=max_bytes, audio_bitrate=audio_bitrate,
+        )
+        send_conn.send(("ok", [str(path) for path in outputs]))
+    except BaseException as error:
+        send_conn.send(("error", type(error).__name__))
+    finally:
+        send_conn.close()
+
+
+async def _split_media_with_deadline(
+    input_path: Path,
+    output_dir: Path,
+    mode: str,
+    profile: str,
+    max_bytes: int,
+    audio_bitrate: int = 192,
+    timeout_seconds: int = 600,
+) -> list[Path]:
+    context = multiprocessing.get_context("spawn")
+    receive_conn, send_conn = context.Pipe(duplex=False)
+    process = context.Process(
+        target=_segment_process_entry,
+        args=(send_conn, str(input_path), str(output_dir), mode, profile, max_bytes, audio_bitrate),
+        daemon=True,
+    )
+    process.start()
+    send_conn.close()
+    try:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_seconds
+        result = None
+        while process.is_alive() or receive_conn.poll():
+            while receive_conn.poll():
+                result = receive_conn.recv()
+            if loop.time() >= deadline and process.is_alive():
+                process.terminate()
+                await asyncio.to_thread(process.join, 5)
+                if process.is_alive():
+                    process.kill()
+                    await asyncio.to_thread(process.join)
+                raise DownloadTimeoutError("Media encoding exceeded its time limit")
+            if process.is_alive():
+                await asyncio.sleep(0.2)
+            else:
+                break
+        process.join()
+        if result is None or result[0] != "ok":
+            raise RuntimeError("Playable media encoding failed")
+        return [Path(path) for path in result[1]]
+    except asyncio.CancelledError:
+        if process.is_alive():
+            process.terminate()
+            await asyncio.to_thread(process.join, 5)
+            if process.is_alive():
+                process.kill()
+                await asyncio.to_thread(process.join)
+        raise
+    finally:
+        receive_conn.close()
+
+
 class K2TelegramBot:
     def __init__(self, config: Config, state: BotState, api: TelegramApi):
         self.config = config
         self.state = state
         self.api = api
+        self._download_lock = asyncio.Lock()
+        self._background_downloads: set[asyncio.Task] = set()
+
+    def has_active_download(self) -> bool:
+        return any(not task.done() for task in self._background_downloads)
+
+    def start_background_download(self, chat_id: str, token: str, media: dict, choice: dict):
+        if self.has_active_download():
+            return None
+        task = asyncio.create_task(
+            self._download_and_send(chat_id, token, media, choice),
+            name=f"k2app-media-{token}",
+        )
+        self._background_downloads.add(task)
+        task.add_done_callback(self._background_downloads.discard)
+        return task
+
+    @staticmethod
+    def _keyboard(token: str, choices: list[dict]) -> dict:
+        buttons = [
+            {"text": str(choice.get("label") or "Download")[:60],
+             "callback_data": f"k2:{token}:{index}"}
+            for index, choice in enumerate(choices)
+        ]
+        rows = [buttons[index:index + 2] for index in range(0, len(buttons), 2)]
+        return {"inline_keyboard": rows}
+
+    @staticmethod
+    def _duration_text(seconds: int | None) -> str:
+        if not seconds or seconds < 0:
+            return "duration unknown"
+        hours, remainder = divmod(int(seconds), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes}:{seconds:02d}"
+
+    @staticmethod
+    def _progress_bar(percent: int | None) -> str:
+        if percent is None:
+            return "[----------]"
+        filled = max(0, min(10, int(percent) // 10))
+        return "[" + "#" * filled + "-" * (10 - filled) + "]"
 
     async def handle_message(self, message: dict) -> None:
         chat = message.get("chat") or {}
@@ -535,12 +900,19 @@ class K2TelegramBot:
             if owner != chat_id:
                 await self.api.send_message(chat_id, "This is a private K2App bot and is already connected to its owner.")
                 return
+            if payload.startswith("dl_") and re.fullmatch(r"dl_[A-Za-z0-9_-]{1,32}", payload):
+                token = payload[3:]
+                media = self.state.get_media_choices(token, chat_id)
+                if media is None:
+                    await self.api.send_message(chat_id, "This chooser link has expired. Send the URL again to get a fresh one.")
+                else:
+                    await self._present_chooser(chat_id, token, media)
+                return
             await self.api.send_message(
                 chat_id,
-                "K2App bot is ready. Send a public media URL to download it here.\n\n"
-                "Commands: /video URL, /audio URL, /help.\n"
-                f"Files up to {self.config.max_upload_bytes // 1_000_000} MB are sent whole; downloads up to "
-                f"{self.config.max_download_bytes // 1_000_000} MB are supported. Larger files are sent as numbered parts.",
+                "K2App bot is ready. Send a public media URL and choose MP4 resolution, MP3 bitrate, or thumbnail.\n\n"
+                "Commands: /video URL, /audio URL, /pair, /help. Large videos are re-encoded into separate playable MP4 segments "
+                "under 48 MB each; they are not raw binary chunks.",
             )
             return
 
@@ -554,81 +926,218 @@ class K2TelegramBot:
         if command in {"help", "start"}:
             await self.api.send_message(
                 chat_id,
-                "Send a public media URL, or use /video URL or /audio URL. "
+                "Send a public media URL to open the format chooser, or use /video URL or /audio URL to narrow it. "
+                "Use /pair to connect the future K2App Lite client with a one-use 5-minute code. "
                 "The bot uses yt-dlp-supported sites; login-only or DRM-protected media is not supported. "
-                f"Downloads are limited to {self.config.max_download_bytes // 1_000_000} MB. Files larger than "
-                f"{self.config.max_upload_bytes // 1_000_000} MB arrive as numbered binary parts; join them in order "
-                "with `cat filename.part* > filename` (Termux/macOS/Linux), or "
-                "`copy /b filename.part* filename` (Windows Command Prompt).",
+                f"Downloads are limited to {self.config.max_download_bytes // 1_000_000} MB. Oversized media is encoded "
+                "as ordered, independently playable MP4 or MP3 segments under 48 MB each. Processing may take longer "
+                "for large files on the free hosting service.",
             )
             return
         if command == "status":
             await self.api.send_message(chat_id, "K2App Telegram downloader is running and ready.")
             return
+        if command == "pair":
+            code = self.state.create_api_pair_code(chat_id)
+            await self.api.send_message(
+                chat_id,
+                f"K2App Lite pairing code: {code}\nEnter it in the Lite app within 5 minutes. It can be used once.",
+            )
+            return
         if command not in {None, "video", "audio", "download"}:
             await self.api.send_message(chat_id, "Unknown command. Send /help for usage.")
             return
 
-        mode = "audio" if command == "audio" else "video"
+        mode_filter = "audio" if command == "audio" else ("video" if command == "video" else None)
         urls = extract_urls(payload if command else text)
         if not urls:
             await self.api.send_message(chat_id, "I couldn't find a public http(s) media URL. Send /help for usage.")
             return
 
         for url in urls:
-            await self._download_and_send(chat_id, url, mode)
+            await self._show_chooser(chat_id, url, mode_filter)
 
-    async def _download_and_send(self, chat_id: str, url: str, mode: str) -> None:
-        await self.api.send_message(chat_id, "Processing your link. I’ll send the file here when it’s ready.")
+    async def _show_chooser(self, chat_id: str, url: str, mode_filter: str | None = None) -> str | None:
+        initial = await self.api.send_message(chat_id, "Checking this link and finding available formats…")
+        message_id = initial.get("message_id") if isinstance(initial, dict) else None
+        try:
+            from media_catalog import resolve_media
+            media = await _resolve_media_with_deadline(url)
+            media["url"] = url
+            if mode_filter == "audio":
+                media["choices"] = [choice for choice in media["choices"] if choice["kind"] == "audio"]
+            elif mode_filter == "video":
+                media["choices"] = [choice for choice in media["choices"] if choice["kind"] in {"video", "thumbnail"}]
+            if not media["choices"]:
+                raise RuntimeError("No formats are available for this selection")
+            token = self.state.save_media_choices(chat_id, media)
+            await self._present_chooser(chat_id, token, media, message_id=message_id)
+            return token
+        except Exception as error:
+            LOGGER.warning("Media metadata lookup failed (error_type=%s)", type(error).__name__)
+            text = "I couldn't inspect this link. It may be unsupported, private, login-protected, DRM-protected, or temporarily unavailable."
+            if message_id:
+                try:
+                    await self.api.edit_message_text(chat_id, message_id, text)
+                except Exception:
+                    await self.api.send_message(chat_id, text)
+            else:
+                await self.api.send_message(chat_id, text)
+            return None
+
+    async def _present_chooser(self, chat_id: str, token: str, media: dict, message_id: int | None = None) -> None:
+        title = str(media.get("title") or "Media")[:180]
+        duration = self._duration_text(media.get("duration_seconds"))
+        text = f"Choose a format and quality for: {title}\nDuration: {duration}\nOptions expire in 30 minutes."
+        keyboard = self._keyboard(token, media.get("choices") or [])
+        if message_id:
+            await self.api.edit_message_text(chat_id, message_id, text, reply_markup=keyboard)
+        else:
+            await self.api.send_message(chat_id, text, reply_markup=keyboard)
+        thumbnail = media.get("thumbnail_url")
+        if isinstance(thumbnail, str) and thumbnail.startswith("https://"):
+            try:
+                await self.api.send_photo_url(chat_id, thumbnail, f"Preview: {title}")
+            except Exception as error:
+                LOGGER.info("Preview image unavailable (error_type=%s)", type(error).__name__)
+
+    async def handle_callback_query(self, query: dict) -> None:
+        callback_id = str(query.get("id") or "")
+        data = str(query.get("data") or "")
+        message = query.get("message") if isinstance(query.get("message"), dict) else {}
+        chat = message.get("chat") or {}
+        chat_id = str(chat.get("id") or "")
+        owner = self.state.owner_chat_id()
+        match = re.fullmatch(r"k2:([A-Za-z0-9_-]{1,32}):([0-9]{1,2})", data)
+        if chat.get("type") != "private" or not chat_id or chat_id != owner or not match:
+            if callback_id:
+                await self.api.answer_callback_query(callback_id, "This button is invalid or belongs to another chat.")
+            return
+        token, choice_index = match.group(1), int(match.group(2))
+        if self.has_active_download():
+            if callback_id:
+                await self.api.answer_callback_query(callback_id, "One media job is already running. Please wait, then tap again.")
+            return
+        selected = self.state.consume_media_choice(token, chat_id, choice_index)
+        if selected is None:
+            if callback_id:
+                await self.api.answer_callback_query(callback_id, "This chooser expired or was already used.")
+            return
+        media, choice = selected
+        if choice.get("kind") == "thumbnail":
+            if callback_id:
+                await self.api.answer_callback_query(callback_id, "Sending thumbnail…")
+            thumb = media.get("thumbnail_url")
+            try:
+                if not isinstance(thumb, str):
+                    raise ValueError("Thumbnail URL unavailable")
+                await self.api.send_photo_url(chat_id, thumb, f"Thumbnail: {str(media.get('title') or 'Media')[:160]}")
+                self.state.set_media_job_status(token, "done", 100, "Thumbnail sent")
+            except Exception as error:
+                self.state.set_media_job_status(token, "failed", 0, "Thumbnail delivery failed")
+                LOGGER.info("Thumbnail delivery failed (error_type=%s)", type(error).__name__)
+                await self.api.send_message(chat_id, "Could not send the thumbnail. Please resend the link to try again.")
+            return
+        task = self.start_background_download(chat_id, token, media, choice)
+        if callback_id:
+            await self.api.answer_callback_query(callback_id, "Starting your selection…")
+        if task is None:
+            self.state.set_media_job_status(token, "failed", 0, "Another media job is active")
+            await self.api.send_message(chat_id, "One media job is already running. Please try again after it completes.")
+
+    async def _download_and_send(self, chat_id: str, token: str, media: dict, choice: dict) -> None:
+        async with self._download_lock:
+            await self._download_and_send_locked(chat_id, token, media, choice)
+
+    async def _download_and_send_locked(self, chat_id: str, token: str, media: dict, choice: dict) -> None:
+        kind = str(choice.get("kind") or "video")
+        mode = "audio" if kind == "audio" else "video"
+        title = str(media.get("title") or "Media")[:180]
+        label = str(choice.get("label") or mode.upper())
+        progress_message = await self.api.send_message(chat_id, f"Starting {label}: {title}")
+        message_id = progress_message.get("message_id") if isinstance(progress_message, dict) else None
+        self.state.set_media_job_status(token, "downloading", 0, "Downloading")
+
+        async def report_progress(status: str, downloaded: int, total: int, percent: int | None) -> None:
+            if percent is not None:
+                job_progress = min(70, int(percent * 0.7))
+                progress_text = f"Downloading {label}\n{self._progress_bar(percent)} {percent}%"
+            else:
+                job_progress = 0
+                progress_text = f"Downloading {label}\n{downloaded / 1_000_000:.1f} MB received"
+            self.state.set_media_job_status(token, "downloading", job_progress, "Downloading")
+            if message_id:
+                try:
+                    await self.api.edit_message_text(chat_id, message_id, progress_text)
+                except Exception:
+                    pass
+
         try:
             with tempfile.TemporaryDirectory(prefix="k2app-telegram-") as directory:
-                media_path, title = await _download_with_deadline(
-                    url, Path(directory), mode, self.config.max_download_bytes
+                work_dir = Path(directory)
+                media_path, downloaded_title = await _download_with_deadline(
+                    str(media["url"]), work_dir, mode, self.config.max_download_bytes,
+                    str(choice.get("format_selector") or "bestvideo*+bestaudio/best"),
+                    int(choice.get("audio_quality") or 192), report_progress,
                 )
-                size = media_path.stat().st_size
-                if size <= self.config.max_upload_bytes:
-                    await self.api.send_media(chat_id, media_path, mode)
-                else:
-                    part_count = (size + self.config.max_upload_bytes - 1) // self.config.max_upload_bytes
+                self.state.set_media_job_status(token, "preparing", 75, "Preparing playable segments")
+                if message_id:
+                    try:
+                        await self.api.edit_message_text(chat_id, message_id, "Preparing independently playable media segments…")
+                    except Exception:
+                        pass
+                height = int(choice.get("height") or 720)
+                profile = "1080p" if height >= 1080 else "720p" if height >= 720 else "480p" if height >= 480 else "360p"
+                max_segment_bytes = min(self.config.max_upload_bytes, 48_000_000)
+                parts = await _split_media_with_deadline(
+                    media_path, work_dir, mode, profile, max_segment_bytes,
+                    int(choice.get("audio_quality") or 192),
+                )
+                if len(parts) == 1:
+                    ready = parts[0].with_name(parts[0].stem.rsplit(".part", 1)[0] + "-ready" + parts[0].suffix)
+                    parts[0].rename(ready)
+                    parts = [ready]
+                if len(parts) > 1:
                     await self.api.send_message(
                         chat_id,
-                        f"This {size / 1_000_000:.1f} MB file exceeds Telegram's single-file limit. "
-                        f"I’ll send {part_count} binary parts in order, each no larger than "
-                        f"{self.config.max_upload_bytes // 1_000_000} MB. "
-                        "Download every part, keep the original part filenames, and reassemble in order: "
-                        "Termux/macOS/Linux: `cat 'filename.part'* > 'filename'`; Windows Command Prompt: "
-                        "`copy /b filename.part* filename`. The result is the original file, not a playable single upload.",
+                        f"Prepared {len(parts)} independently playable {'.mp3' if mode == 'audio' else '.mp4'} segments. "
+                        "Each is below 48 MB; these are trimmed/encoded media files, not raw binary pieces.",
                     )
-                    parts = split_file(media_path, Path(directory), self.config.max_upload_bytes)
-                    try:
-                        for part in parts:
-                            await self.api.send_media(chat_id, part, "document")
-                    finally:
-                        close = getattr(parts, "close", None)
-                        if close is not None:
-                            close()
-            await self.api.send_message(chat_id, f"Sent: {title[:180]}")
+                for index, part in enumerate(parts, start=1):
+                    upload_progress = 75 + int(25 * index / len(parts))
+                    self.state.set_media_job_status(token, "uploading", upload_progress, f"Uploading {index}/{len(parts)}")
+                    if message_id:
+                        try:
+                            await self.api.edit_message_text(
+                                chat_id, message_id, f"Uploading playable segment {index}/{len(parts)}\n"
+                                f"{self._progress_bar(upload_progress)} {upload_progress}%",
+                            )
+                        except Exception:
+                            pass
+                    await self.api.send_media(chat_id, part, mode)
+            self.state.set_media_job_status(token, "done", 100, "Complete")
+            if message_id:
+                try:
+                    await self.api.edit_message_text(chat_id, message_id, f"Complete: {downloaded_title[:180]}")
+                except Exception:
+                    pass
+            else:
+                await self.api.send_message(chat_id, f"Sent: {downloaded_title[:180]}")
         except MediaTooLargeError as error:
+            self.state.set_media_job_status(token, "failed", 0, "Download limit exceeded")
             actual = f" ({error.size_bytes / 1_000_000:.1f} MB)" if error.size_bytes else ""
-            await self.api.send_message(
-                chat_id,
-                f"The file{actual} exceeds the configured {error.limit_bytes // 1_000_000} MB download limit. "
-                "Try a smaller format or shorter source.",
-            )
+            await self.api.send_message(chat_id, f"The file{actual} exceeds the configured {error.limit_bytes // 1_000_000} MB download limit. Try a smaller quality.")
         except DownloadTimeoutError:
-            await self.api.send_message(chat_id, "I couldn't finish downloading that link before the time limit. Please try again.")
+            self.state.set_media_job_status(token, "failed", 0, "Processing timed out")
+            await self.api.send_message(chat_id, "Processing took too long for the current free server. Try a lower resolution or shorter video.")
         except TelegramApiError as error:
+            self.state.set_media_job_status(token, "failed", 0, "Telegram upload failed")
             LOGGER.warning("Telegram send failed (code=%s)", error.error_code)
-            await self.api.send_message(
-                chat_id,
-                "Telegram could not accept this file or part. Please try again or choose a smaller format.",
-            )
+            await self.api.send_message(chat_id, "Telegram could not accept this file. Try a lower resolution or shorter segment.")
         except Exception as error:
+            self.state.set_media_job_status(token, "failed", 0, "Media processing failed")
             LOGGER.warning("Media processing failed (error_type=%s)", type(error).__name__)
-            await self.api.send_message(
-                chat_id,
-                "I couldn't download that link. It may be unsupported, private, login-protected, or larger than the download limit.",
-            )
+            await self.api.send_message(chat_id, "I couldn't finish this media conversion. Try a lower resolution or a shorter source.")
 
 
 async def run_bot(config: Config) -> None:
@@ -645,7 +1154,7 @@ async def run_bot(config: Config) -> None:
             try:
                 updates = await api.call(
                     "getUpdates",
-                    {"offset": offset, "timeout": 30, "allowed_updates": ["message"]},
+                    {"offset": offset, "timeout": 30, "allowed_updates": ["message", "callback_query"]},
                     timeout=httpx.Timeout(45.0, connect=20.0),
                 )
                 for update in updates or []:
@@ -654,6 +1163,9 @@ async def run_bot(config: Config) -> None:
                         message = update.get("message")
                         if isinstance(message, dict):
                             await bot.handle_message(message)
+                        callback_query = update.get("callback_query")
+                        if isinstance(callback_query, dict):
+                            await bot.handle_callback_query(callback_query)
                         next_offset = max(offset, update_id + 1)
                         state.save_offset(next_offset)
                         offset = next_offset

@@ -15,7 +15,6 @@ from bot import (
     extract_urls,
     is_safe_http_url,
     parse_command,
-    split_file,
 )
 
 
@@ -228,85 +227,59 @@ class BotStateTests(unittest.TestCase):
             self.assertEqual(state.owner_chat_id(), "111")
             self.assertIn("already connected", api.messages[-1][1])
 
-
-class FileSplitTests(unittest.TestCase):
-    def test_splits_boundary_sizes_to_ordered_deterministic_parts(self):
+    def test_media_choice_session_is_owner_bound_and_single_use(self):
         with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            source = root / "movie.mkv"
-            source.write_bytes(b"abcdefghij")
-            parts = split_file(source, root, chunk_bytes=4)
-            observed = []
-            for part in parts:
-                observed.append((part.name, part.read_bytes(), part.stat().st_size))
-                if len(observed) > 1:
-                    self.assertFalse((root / "movie.mkv.part001").exists())
-            self.assertEqual(
-                observed,
-                [
-                    ("movie.mkv.part001", b"abcd", 4),
-                    ("movie.mkv.part002", b"efgh", 4),
-                    ("movie.mkv.part003", b"ij", 2),
-                ],
-            )
-            self.assertFalse((root / "movie.mkv.part003").exists())
+            state = BotState(Path(folder) / "state.sqlite3", configured_owner="12345")
+            media = {"url": "https://example.com/video", "title": "clip", "choices": [
+                {"kind": "video", "label": "MP4 720p", "format_selector": "v1+a1", "height": 720},
+            ]}
+            token = state.save_media_choices("12345", media)
+            self.assertEqual(state.media_job_status(token, "12345")["status"], "chooser_ready")
+            self.assertIsNone(state.consume_media_choice(token, "99999", 0))
+            self.assertIsNone(state.consume_media_choice(token, "12345", 4))
+            selected = state.consume_media_choice(token, "12345", 0)
+            self.assertEqual(selected[1]["label"], "MP4 720p")
+            self.assertIsNone(state.consume_media_choice(token, "12345", 0))
+            self.assertEqual(state.media_job_status(token, "12345")["status"], "queued")
 
-    def test_split_reads_in_bounded_blocks(self):
-        import builtins
-        from unittest.mock import mock_open
-
+    def test_expired_media_choice_cannot_be_opened_or_selected(self):
         with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            source = root / "large.bin"
-            source.write_bytes(b"abcdefgh")
-            real_open = Path.open
-            requested_sizes = []
+            state = BotState(Path(folder) / "state.sqlite3", configured_owner="12345")
+            token = state.save_media_choices("12345", {"choices": [{"kind": "audio"}]}, ttl_seconds=-1)
+            self.assertIsNone(state.get_media_choices(token, "12345"))
+            self.assertIsNone(state.consume_media_choice(token, "12345", 0))
 
-            class Reader:
-                def __init__(self, stream):
-                    self.stream = stream
-                def __enter__(self):
-                    return self
-                def __exit__(self, *args):
-                    self.stream.close()
-                def read(self, size=-1):
-                    requested_sizes.append(size)
-                    return self.stream.read(size)
 
-            def tracked_open(path, mode="r", *args, **kwargs):
-                stream = real_open(path, mode, *args, **kwargs)
-                return Reader(stream) if path == source and mode == "rb" else stream
+class MediaDeliveryTests(unittest.TestCase):
 
-            with patch.object(Path, "open", tracked_open), patch("bot.PART_COPY_BLOCK_BYTES", 3):
-                for _ in split_file(source, root, chunk_bytes=8):
-                    pass
-            self.assertTrue(requested_sizes)
-            self.assertTrue(all(0 < size <= 3 for size in requested_sizes))
-
-    def test_oversized_media_is_announced_then_sent_in_part_order_as_documents(self):
+    def test_selected_audio_is_sent_as_playable_mp3_segments(self):
         from unittest.mock import AsyncMock
 
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             source = root / "movie.mkv"
             source.write_bytes(b"source")
-            part1, part2 = root / "movie.mkv.part001", root / "movie.mkv.part002"
+            part1, part2 = root / "movie.part001.mp3", root / "movie.part002.mp3"
             part1.write_bytes(b"one")
             part2.write_bytes(b"two")
             config = Config(TOKEN, "https://api.telegram.org", root / "state.db", 3, 100,
                             "123", None)
             api = FakeApi()
             api.send_media = AsyncMock(side_effect=lambda chat, path, mode: api.messages.append(("media", path.name, mode)))
-            bot = K2TelegramBot(config, BotState(root / "state.db", "123"), api)
+            state = BotState(root / "state.db", "123")
+            bot = K2TelegramBot(config, state, api)
+            token = state.save_media_choices("123", {"url": "https://example.com/movie", "choices": []})
+            media = {"url": "https://example.com/movie", "title": "Movie"}
+            choice = {"kind": "audio", "label": "MP3 · 192 kbps", "format_selector": "a1", "audio_quality": 192}
             with patch("bot._download_with_deadline", new=AsyncMock(return_value=(source, "Movie"))), \
-                 patch("bot.split_file", return_value=[part1, part2]):
-                asyncio.run(bot._download_and_send("123", "https://example.com/movie", "audio"))
-            self.assertTrue(api.messages[1][1].startswith("This 0.0 MB file"))
-            self.assertEqual(api.messages[2:], [
-                ("media", "movie.mkv.part001", "document"),
-                ("media", "movie.mkv.part002", "document"),
-                ("123", "Sent: Movie"),
+                 patch("bot._split_media_with_deadline", new=AsyncMock(return_value=[part1, part2])):
+                asyncio.run(bot._download_and_send("123", token, media, choice))
+            self.assertEqual([item for item in api.messages if item[0] == "media"], [
+                ("media", "movie.part001.mp3", "audio"),
+                ("media", "movie.part002.mp3", "audio"),
             ])
+            self.assertTrue(any("independently playable" in item[1] for item in api.messages if item[0] == "123"))
+            self.assertEqual(state.media_job_status(token, "123")["status"], "done")
 
 
 if __name__ == "__main__":
