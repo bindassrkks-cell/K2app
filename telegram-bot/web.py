@@ -23,7 +23,7 @@ from bot import BotState, Config, ConfigurationError, K2TelegramBot, TelegramApi
 LOGGER = logging.getLogger("k2app.telegram_webhook")
 MAX_BODY_BYTES = 1_000_000
 MAX_PENDING_UPDATES = 100
-PROCESSING_TIMEOUT_SECONDS = 300
+PROCESSING_TIMEOUT_SECONDS = 840
 DONE_UPDATE_RETENTION = 1000
 WEBHOOK_PATH = "/telegram/webhook"
 

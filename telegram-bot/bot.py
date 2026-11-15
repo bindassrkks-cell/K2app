@@ -13,6 +13,7 @@ import re
 import sqlite3
 import socket
 import tempfile
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,8 @@ EXCLUDED_SUFFIXES = {
     ".webp", ".vtt", ".srt", ".ass", ".lrc", ".temp",
 }
 DOWNLOAD_TIMEOUT_SECONDS = 270
+UPLOAD_PART_BYTES = 49_000_000
+PART_COPY_BLOCK_BYTES = 1024 * 1024
 
 
 class ConfigurationError(ValueError):
@@ -75,6 +78,7 @@ class Config:
     api_base: str
     state_file: Path
     max_upload_bytes: int
+    max_download_bytes: int
     owner_chat_id: str | None
     setup_code: str | None
 
@@ -115,9 +119,15 @@ class Config:
             and max_upload_mb * 1_000_000 > PUBLIC_BOT_API_MAX_BYTES
         ):
             raise ConfigurationError(
-                "MAX_UPLOAD_MB cannot exceed 50 with Telegram's hosted Bot API; "
-                "configure a self-hosted Bot API server for larger uploads"
+                "MAX_UPLOAD_MB cannot exceed 50 with Telegram's hosted Bot API"
             )
+
+        try:
+            max_download_mb = int(os.getenv("MAX_DOWNLOAD_MB", "1024"))
+        except ValueError as error:
+            raise ConfigurationError("MAX_DOWNLOAD_MB must be an integer") from error
+        if not 1 <= max_download_mb <= 1024:
+            raise ConfigurationError("MAX_DOWNLOAD_MB must be between 1 and 1024")
 
         owner_chat_id = os.getenv("OWNER_CHAT_ID", "").strip() or None
         if owner_chat_id is not None and (
@@ -136,6 +146,7 @@ class Config:
             api_base=api_base,
             state_file=state_file,
             max_upload_bytes=max_upload_mb * 1_000_000,
+            max_download_bytes=max_download_mb * 1_000_000,
             owner_chat_id=owner_chat_id,
             setup_code=setup_code,
         )
@@ -338,6 +349,29 @@ def extract_urls(text: str) -> list[str]:
     return urls[:MAX_URLS_PER_MESSAGE]
 
 
+def split_file(path: Path, work_dir: Path, chunk_bytes: int = UPLOAD_PART_BYTES) -> Generator[Path, None, None]:
+    """Yield numbered chunks one at a time without loading or duplicating the whole file."""
+    if chunk_bytes <= 0:
+        raise ValueError("chunk_bytes must be positive")
+    total = path.stat().st_size
+    count = (total + chunk_bytes - 1) // chunk_bytes
+    with path.open("rb") as source:
+        for index in range(1, count + 1):
+            part = work_dir / f"{path.name}.part{index:03d}"
+            remaining = min(chunk_bytes, total - (index - 1) * chunk_bytes)
+            with part.open("wb") as target:
+                while remaining:
+                    block = source.read(min(PART_COPY_BLOCK_BYTES, remaining))
+                    if not block:
+                        raise OSError("Source file ended while splitting")
+                    target.write(block)
+                    remaining -= len(block)
+            try:
+                yield part
+            finally:
+                part.unlink(missing_ok=True)
+
+
 def _download_media(url: str, work_dir: Path, mode: str, max_bytes: int) -> tuple[Path, str]:
     try:
         from yt_dlp import YoutubeDL
@@ -505,7 +539,8 @@ class K2TelegramBot:
                 chat_id,
                 "K2App bot is ready. Send a public media URL to download it here.\n\n"
                 "Commands: /video URL, /audio URL, /help.\n"
-                f"Current upload limit: {self.config.max_upload_bytes // 1_000_000} MB.",
+                f"Files up to {self.config.max_upload_bytes // 1_000_000} MB are sent whole; downloads up to "
+                f"{self.config.max_download_bytes // 1_000_000} MB are supported. Larger files are sent as numbered parts.",
             )
             return
 
@@ -521,7 +556,10 @@ class K2TelegramBot:
                 chat_id,
                 "Send a public media URL, or use /video URL or /audio URL. "
                 "The bot uses yt-dlp-supported sites; login-only or DRM-protected media is not supported. "
-                f"Files must fit the configured {self.config.max_upload_bytes // 1_000_000} MB upload limit.",
+                f"Downloads are limited to {self.config.max_download_bytes // 1_000_000} MB. Files larger than "
+                f"{self.config.max_upload_bytes // 1_000_000} MB arrive as numbered binary parts; join them in order "
+                "with `cat filename.part* > filename` (Termux/macOS/Linux), or "
+                "`copy /b filename.part* filename` (Windows Command Prompt).",
             )
             return
         if command == "status":
@@ -545,16 +583,37 @@ class K2TelegramBot:
         try:
             with tempfile.TemporaryDirectory(prefix="k2app-telegram-") as directory:
                 media_path, title = await _download_with_deadline(
-                    url, Path(directory), mode, self.config.max_upload_bytes
+                    url, Path(directory), mode, self.config.max_download_bytes
                 )
-                await self.api.send_media(chat_id, media_path, mode)
+                size = media_path.stat().st_size
+                if size <= self.config.max_upload_bytes:
+                    await self.api.send_media(chat_id, media_path, mode)
+                else:
+                    part_count = (size + self.config.max_upload_bytes - 1) // self.config.max_upload_bytes
+                    await self.api.send_message(
+                        chat_id,
+                        f"This {size / 1_000_000:.1f} MB file exceeds Telegram's single-file limit. "
+                        f"I’ll send {part_count} binary parts in order, each no larger than "
+                        f"{self.config.max_upload_bytes // 1_000_000} MB. "
+                        "Download every part, keep the original part filenames, and reassemble in order: "
+                        "Termux/macOS/Linux: `cat 'filename.part'* > 'filename'`; Windows Command Prompt: "
+                        "`copy /b filename.part* filename`. The result is the original file, not a playable single upload.",
+                    )
+                    parts = split_file(media_path, Path(directory), self.config.max_upload_bytes)
+                    try:
+                        for part in parts:
+                            await self.api.send_media(chat_id, part, "document")
+                    finally:
+                        close = getattr(parts, "close", None)
+                        if close is not None:
+                            close()
             await self.api.send_message(chat_id, f"Sent: {title[:180]}")
         except MediaTooLargeError as error:
             actual = f" ({error.size_bytes / 1_000_000:.1f} MB)" if error.size_bytes else ""
             await self.api.send_message(
                 chat_id,
-                f"The file{actual} exceeds the configured {error.limit_bytes // 1_000_000} MB limit. "
-                "The regular Telegram Bot API accepts uploads up to 50 MB; larger uploads require a self-hosted Bot API server.",
+                f"The file{actual} exceeds the configured {error.limit_bytes // 1_000_000} MB download limit. "
+                "Try a smaller format or shorter source.",
             )
         except DownloadTimeoutError:
             await self.api.send_message(chat_id, "I couldn't finish downloading that link before the time limit. Please try again.")
@@ -562,14 +621,13 @@ class K2TelegramBot:
             LOGGER.warning("Telegram send failed (code=%s)", error.error_code)
             await self.api.send_message(
                 chat_id,
-                "Telegram could not accept the file. It may exceed the Bot API limit; "
-                "use a lower-size format or configure a self-hosted Bot API server for larger files.",
+                "Telegram could not accept this file or part. Please try again or choose a smaller format.",
             )
         except Exception as error:
             LOGGER.warning("Media processing failed (error_type=%s)", type(error).__name__)
             await self.api.send_message(
                 chat_id,
-                "I couldn't download that link. It may be unsupported, private, login-protected, or larger than the upload limit.",
+                "I couldn't download that link. It may be unsupported, private, login-protected, or larger than the download limit.",
             )
 
 
