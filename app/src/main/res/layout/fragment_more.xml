@@ -3,60 +3,199 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="match_parent"
+    android:background="@color/k2_ui_background">
+
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:fillViewport="true">
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="top"
             android:orientation="vertical"
+            android:paddingStart="20dp"
+            android:paddingTop="28dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="24dp"
             tools:ignore="MissingConstraints">
-            
-            <TextView
-                android:id="@+id/logs"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/logs"
-                android:textStyle="bold"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="?android:attr/selectableItemBackground"
-                android:paddingHorizontal="15dp"
-                android:paddingVertical="15dp"
-                android:drawablePadding="35dp"
-                android:textSize="16sp"
-                app:drawableStartCompat="@drawable/ic_baseline_file_open_24" />
 
             <TextView
-                android:id="@+id/settings"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:drawablePadding="35dp"
-                android:textSize="16sp"
-                android:paddingVertical="15dp"
-                android:text="@string/settings"
-                android:textStyle="bold"
+                android:text="@string/more"
+                android:textColor="@color/k2_ui_text_primary"
+                android:textSize="30sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="22dp"
+                android:text="@string/ui_more_subtitle"
+                android:textColor="@color/k2_ui_text_secondary"
+                android:textSize="14sp" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/settings_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="26dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="?android:attr/selectableItemBackground"
-                android:paddingHorizontal="15dp"
-                app:drawableStartCompat="@drawable/ic_settings" />
+                app:cardBackgroundColor="@color/k2_ui_surface_high"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp"
+                app:rippleColor="@color/k2_ui_accent_container"
+                app:strokeColor="@color/k2_ui_outline"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="12dp">
+
+                    <TextView
+                        android:id="@+id/settings"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:background="?android:attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:drawablePadding="18dp"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="12dp"
+                        android:text="@string/settings"
+                        android:textColor="@color/k2_ui_text_primary"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        app:drawableStartCompat="@drawable/ic_settings" />
+
+                    <TextView
+                        android:id="@+id/settings_summary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="52dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="4dp"
+                        android:text="@string/ui_settings_personalize"
+                        android:textColor="@color/k2_ui_text_secondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:text="@string/ui_tools_header"
+                android:textColor="@color/k2_ui_text_primary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="18dp"
+                app:cardBackgroundColor="@color/k2_ui_surface"
+                app:cardCornerRadius="18dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/k2_ui_outline"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <TextView
+                        android:id="@+id/logs"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?android:attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="58dp"
+                        android:paddingHorizontal="18dp"
+                        android:drawablePadding="18dp"
+                        android:textColor="@color/k2_ui_text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:text="@string/logs"
+                        app:drawableStartCompat="@drawable/ic_baseline_file_open_24" />
+                    <TextView
+                        android:id="@+id/command_templates"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?android:attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="58dp"
+                        android:paddingHorizontal="18dp"
+                        android:drawablePadding="18dp"
+                        android:textColor="@color/k2_ui_text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:text="@string/command_templates"
+                        app:drawableStartCompat="@drawable/ic_baseline_keyboard_arrow_right_24" />
+                    <TextView
+                        android:id="@+id/cookies"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?android:attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="58dp"
+                        android:paddingHorizontal="18dp"
+                        android:drawablePadding="18dp"
+                        android:textColor="@color/k2_ui_text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:text="@string/cookies"
+                        app:drawableStartCompat="@drawable/baseline_cookie_24" />
+                    <TextView
+                        android:id="@+id/observe_sources"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?android:attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="58dp"
+                        android:paddingHorizontal="18dp"
+                        android:drawablePadding="18dp"
+                        android:textColor="@color/k2_ui_text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:text="@string/observe_sources"
+                        app:drawableStartCompat="@drawable/baseline_calendar_month_24" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
             <TextView
                 android:id="@+id/developer_mode"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:drawablePadding="35dp"
-                android:textSize="16sp"
-                android:paddingVertical="15dp"
-                android:text="Developer Mode"
-                android:textStyle="bold"
-                android:clickable="true"
-                android:focusable="true"
                 android:background="?android:attr/selectableItemBackground"
-                android:paddingHorizontal="15dp"
+                android:clickable="true"
+                android:drawablePadding="16dp"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="56dp"
+                android:paddingHorizontal="16dp"
+                android:text="@string/ui_developer_tools"
+                android:textColor="@color/k2_ui_text_secondary"
+                android:textSize="15sp"
+                android:textStyle="bold"
                 app:drawableStartCompat="@drawable/ic_code" />
 
             <LinearLayout
@@ -64,99 +203,57 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:visibility="gone"
-                android:paddingStart="20dp">
-                
+                android:paddingStart="12dp"
+                android:visibility="gone">
                 <TextView
                     android:id="@+id/terminal"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="58dp"
+                    android:paddingHorizontal="18dp"
+                    android:drawablePadding="18dp"
+                    android:textColor="@color/k2_ui_text_primary"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
                     android:text="@string/terminal"
-                    android:textStyle="bold"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="?android:attr/selectableItemBackground"
-                    android:paddingHorizontal="15dp"
-                    android:paddingVertical="15dp"
-                    android:drawablePadding="35dp"
-                    android:textSize="16sp"
                     app:drawableStartCompat="@drawable/ic_terminal" />
-
-                <TextView
-                    android:id="@+id/command_templates"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:drawablePadding="35dp"
-                    android:textSize="16sp"
-                    android:paddingVertical="15dp"
-                    android:text="@string/command_templates"
-                    android:textStyle="bold"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="?android:attr/selectableItemBackground"
-                    android:paddingHorizontal="15dp"
-                    app:drawableStartCompat="@drawable/ic_baseline_keyboard_arrow_right_24" />
-
-                <TextView
-                    android:id="@+id/cookies"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:drawablePadding="35dp"
-                    android:textSize="16sp"
-                    android:paddingVertical="15dp"
-                    android:text="@string/cookies"
-                    android:textStyle="bold"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="?android:attr/selectableItemBackground"
-                    android:paddingHorizontal="15dp"
-                    app:drawableStartCompat="@drawable/baseline_cookie_24" />
-
-                <TextView
-                    android:id="@+id/observe_sources"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:drawablePadding="35dp"
-                    android:textSize="16sp"
-                    android:paddingVertical="15dp"
-                    android:text="@string/observe_sources"
-                    android:textStyle="bold"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="?android:attr/selectableItemBackground"
-                    android:paddingHorizontal="15dp"
-                    app:drawableStartCompat="@drawable/baseline_calendar_month_24" />
-
                 <TextView
                     android:id="@+id/terminate"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:drawablePadding="35dp"
-                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
                     android:clickable="true"
                     android:focusable="true"
-                    android:background="?android:attr/selectableItemBackground"
-                    android:paddingVertical="15dp"
-                    android:text="@string/kill_app"
+                    android:gravity="center_vertical"
+                    android:minHeight="58dp"
+                    android:paddingHorizontal="18dp"
+                    android:drawablePadding="18dp"
+                    android:textColor="@color/k2_ui_text_primary"
+                    android:textSize="16sp"
                     android:textStyle="bold"
-                    android:paddingHorizontal="15dp"
+                    android:text="@string/kill_app"
                     app:drawableStartCompat="@drawable/ic_power" />
-            
                 <TextView
                     android:id="@+id/about_app"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:drawablePadding="35dp"
-                    android:textSize="16sp"
-                    android:paddingVertical="15dp"
-                    android:text="About App"
-                    android:textStyle="bold"
+                    android:background="?android:attr/selectableItemBackground"
                     android:clickable="true"
                     android:focusable="true"
-                    android:background="?android:attr/selectableItemBackground"
-                    android:paddingHorizontal="15dp"
+                    android:gravity="center_vertical"
+                    android:minHeight="58dp"
+                    android:paddingHorizontal="18dp"
+                    android:drawablePadding="18dp"
+                    android:textColor="@color/k2_ui_text_primary"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:text="About App"
                     app:drawableStartCompat="@drawable/ic_info" />
-\n            </LinearLayout>
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
 </RelativeLayout>
