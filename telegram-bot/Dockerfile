@@ -20,4 +20,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=k2bot:k2bot . .
 
 USER k2bot
-CMD ["python", "bot.py"]
+CMD ["sh", "-c", "uvicorn web:app --host 0.0.0.0 --port ${PORT:-10000}"]

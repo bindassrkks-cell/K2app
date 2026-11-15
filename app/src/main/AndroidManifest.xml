@@ -590,11 +590,6 @@
             android:foregroundServiceType="dataSync|shortService"
             tools:node="merge" />
 
-        <service
-            android:name=".service.TelegramPollingService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

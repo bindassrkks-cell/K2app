@@ -7,6 +7,7 @@ import hmac
 import ipaddress
 import logging
 import mimetypes
+import multiprocessing
 import os
 import re
 import sqlite3
@@ -29,6 +30,7 @@ EXCLUDED_SUFFIXES = {
     ".part", ".ytdl", ".json", ".description", ".jpg", ".jpeg", ".png",
     ".webp", ".vtt", ".srt", ".ass", ".lrc", ".temp",
 }
+DOWNLOAD_TIMEOUT_SECONDS = 270
 
 
 class ConfigurationError(ValueError):
@@ -407,6 +409,65 @@ def _download_media(url: str, work_dir: Path, mode: str, max_bytes: int) -> tupl
     return media_path, str(info.get("title") or media_path.name)
 
 
+def _download_process_entry(send_conn, url: str, work_dir: str, mode: str, max_bytes: int) -> None:
+    try:
+        path, title = _download_media(url, Path(work_dir), mode, max_bytes)
+        send_conn.send(("ok", str(path), title))
+    except MediaTooLargeError as error:
+        send_conn.send(("too_large", error.size_bytes, error.limit_bytes))
+    except BaseException as error:
+        send_conn.send(("error", type(error).__name__))
+    finally:
+        send_conn.close()
+
+
+class DownloadTimeoutError(TimeoutError):
+    pass
+
+
+async def _download_with_deadline(url: str, work_dir: Path, mode: str, max_bytes: int) -> tuple[Path, str]:
+    """Run yt-dlp in a killable process; coroutine cancellation cannot orphan the downloader."""
+    context = multiprocessing.get_context("spawn")
+    receive_conn, send_conn = context.Pipe(duplex=False)
+    process = context.Process(
+        target=_download_process_entry,
+        args=(send_conn, url, str(work_dir), mode, max_bytes),
+        daemon=True,
+    )
+    process.start()
+    send_conn.close()
+    try:
+        deadline = asyncio.get_running_loop().time() + DOWNLOAD_TIMEOUT_SECONDS
+        while process.is_alive() and asyncio.get_running_loop().time() < deadline:
+            await asyncio.sleep(0.1)
+        if process.is_alive():
+            process.terminate()
+            await asyncio.to_thread(process.join, 5)
+            if process.is_alive():
+                process.kill()
+                await asyncio.to_thread(process.join)
+            raise DownloadTimeoutError("Media download exceeded its time limit")
+        process.join()
+        if not receive_conn.poll():
+            raise RuntimeError("Media downloader exited without a result")
+        result = receive_conn.recv()
+        if result[0] == "ok":
+            return Path(result[1]), result[2]
+        if result[0] == "too_large":
+            raise MediaTooLargeError(result[1], result[2])
+        raise RuntimeError("Media download failed")
+    except asyncio.CancelledError:
+        if process.is_alive():
+            process.terminate()
+            await asyncio.to_thread(process.join, 5)
+            if process.is_alive():
+                process.kill()
+                await asyncio.to_thread(process.join)
+        raise
+    finally:
+        receive_conn.close()
+
+
 class K2TelegramBot:
     def __init__(self, config: Config, state: BotState, api: TelegramApi):
         self.config = config
@@ -483,12 +544,8 @@ class K2TelegramBot:
         await self.api.send_message(chat_id, "Processing your link. I’ll send the file here when it’s ready.")
         try:
             with tempfile.TemporaryDirectory(prefix="k2app-telegram-") as directory:
-                media_path, title = await asyncio.to_thread(
-                    _download_media,
-                    url,
-                    Path(directory),
-                    mode,
-                    self.config.max_upload_bytes,
+                media_path, title = await _download_with_deadline(
+                    url, Path(directory), mode, self.config.max_upload_bytes
                 )
                 await self.api.send_media(chat_id, media_path, mode)
             await self.api.send_message(chat_id, f"Sent: {title[:180]}")
@@ -499,6 +556,8 @@ class K2TelegramBot:
                 f"The file{actual} exceeds the configured {error.limit_bytes // 1_000_000} MB limit. "
                 "The regular Telegram Bot API accepts uploads up to 50 MB; larger uploads require a self-hosted Bot API server.",
             )
+        except DownloadTimeoutError:
+            await self.api.send_message(chat_id, "I couldn't finish downloading that link before the time limit. Please try again.")
         except TelegramApiError as error:
             LOGGER.warning("Telegram send failed (code=%s)", error.error_code)
             await self.api.send_message(

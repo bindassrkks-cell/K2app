@@ -1,122 +1,106 @@
 package com.deniscerri.ytdl.util.telegram
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.text.InputType
+import android.net.Uri
 import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import androidx.core.content.ContextCompat
 import com.deniscerri.ytdl.R
-import com.deniscerri.ytdl.service.TelegramPollingService
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
 object TelegramBotSettingsDialog {
+    private const val DEFAULT_API_URL = "https://k2app-telegram-bot.onrender.com"
+    private val BOT_USERNAME_PATTERN = Regex("^[A-Za-z0-9_]{5,32}$")
+
     fun show(context: Context, onChanged: () -> Unit) {
         val view = android.view.LayoutInflater.from(context)
             .inflate(R.layout.dialog_telegram_bot_settings, null, false)
-        val tokenLayout = view.findViewById<TextInputLayout>(R.id.telegram_token_layout)
-        val chatLayout = view.findViewById<TextInputLayout>(R.id.telegram_chat_layout)
-        val tokenInput = view.findViewById<TextInputEditText>(R.id.telegram_token_input)
-        val chatInput = view.findViewById<TextInputEditText>(R.id.telegram_chat_input)
-        val status = view.findViewById<android.widget.TextView>(R.id.telegram_status)
-        val store = TelegramBotConfigStore(context)
-        val existing = store.load()
+        val urlLayout = view.findViewById<TextInputLayout>(R.id.telegram_server_url_layout)
+        val urlInput = view.findViewById<TextInputEditText>(R.id.telegram_server_url_input)
+        val status = view.findViewById<TextView>(R.id.telegram_status)
+        val openBot = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.telegram_open_bot)
+        val store = TelegramServerConnectionStore(context)
+        val savedUrl = store.loadUrl()
+        urlInput.setText(savedUrl ?: DEFAULT_API_URL)
 
-        tokenInput.inputType = InputType.TYPE_CLASS_TEXT or
-            InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-        existing?.let {
-            tokenInput.setText(it.token)
-            chatInput.setText(it.chatId)
-        }
-        if (TelegramPollingService.isRunning) {
-            status.visibility = View.VISIBLE
-            status.setText(R.string.telegram_polling_status)
-        } else if (existing != null) {
-            status.visibility = View.VISIBLE
-            status.setText(R.string.telegram_credentials_saved)
-        }
-
+        var botUrl: String? = null
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        var requestJob: Job? = null
         val dialog = MaterialAlertDialogBuilder(context)
             .setTitle(R.string.telegram_bot)
             .setView(view)
-            .setPositiveButton(R.string.telegram_connect_start, null)
+            .setPositiveButton(R.string.telegram_connect, null)
             .setNeutralButton(R.string.telegram_disconnect, null)
             .setNegativeButton(R.string.cancel, null)
             .create()
 
+        dialog.setOnDismissListener {
+            requestJob?.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
         dialog.setOnShowListener {
-            val connectButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            val disconnectButton = dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
-            disconnectButton.isEnabled = existing != null
-
-            disconnectButton.setOnClickListener {
+            val connect = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            val clear = dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
+            clear.isEnabled = savedUrl != null
+            if (savedUrl != null) {
+                status.visibility = View.VISIBLE
+                status.setText(R.string.telegram_server_saved)
+                openBot.visibility = View.VISIBLE
+            }
+            openBot.setOnClickListener {
+                val target = botUrl
+                if (target != null) openTelegramBot(context, target)
+                else status.setText(R.string.telegram_connect_to_find_bot)
+            }
+            clear.setOnClickListener {
                 store.clear()
-                context.stopService(Intent(context, TelegramPollingService::class.java))
                 Toast.makeText(context, R.string.telegram_disconnect_success, Toast.LENGTH_SHORT).show()
                 onChanged()
                 dialog.dismiss()
             }
-
-            connectButton.setOnClickListener {
-                tokenLayout.error = null
-                chatLayout.error = null
-                val token = tokenInput.text?.toString()?.trim().orEmpty()
-                val chatId = chatInput.text?.toString()?.trim().orEmpty()
-                if (!TOKEN_PATTERN.matches(token)) {
-                    tokenLayout.error = context.getString(R.string.telegram_token_required)
+            connect.setOnClickListener {
+                urlLayout.error = null
+                val baseUrl = normalizeApiUrl(urlInput.text?.toString().orEmpty())
+                if (baseUrl == null) {
+                    urlLayout.error = context.getString(R.string.telegram_server_url_invalid)
                     return@setOnClickListener
                 }
-                if (!CHAT_ID_PATTERN.matches(chatId)) {
-                    chatLayout.error = context.getString(R.string.telegram_chat_id_required)
-                    return@setOnClickListener
-                }
-
-                connectButton.isEnabled = false
-                disconnectButton.isEnabled = false
-                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = false
+                requestJob?.cancel()
+                connect.isEnabled = false
+                clear.isEnabled = false
                 status.visibility = View.VISIBLE
+                openBot.visibility = View.GONE
                 status.setText(R.string.telegram_connecting)
-                CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
+                requestJob = scope.launch {
                     try {
-                        val identity = withContext(Dispatchers.IO) {
-                            TelegramBotApi.validateForPolling(token).also {
-                                TelegramBotApi.validateChat(token, chatId)
-                            }
-                        }
-                        val initialOffset = if (existing?.token == token) {
-                            store.updateOffset()
-                        } else {
-                            withContext(Dispatchers.IO) { TelegramBotApi.discardPendingUpdates(token) }
-                        }
-
-                        context.stopService(Intent(context, TelegramPollingService::class.java))
-                        store.save(TelegramBotConfigStore.Config(token, chatId))
-                        store.setUpdateOffset(initialOffset)
-                        ContextCompat.startForegroundService(
-                            context,
-                            Intent(context, TelegramPollingService::class.java)
-                                .setAction(TelegramPollingService.ACTION_START)
-                        )
-                        status.text = context.getString(R.string.telegram_connect_success, identity.username)
-                        Toast.makeText(context, status.text, Toast.LENGTH_LONG).show()
+                        val identity = withContext(Dispatchers.IO) { fetchStatus(baseUrl) }
+                        store.saveUrl(baseUrl)
+                        botUrl = "https://t.me/${identity.second}"
+                        status.text = context.getString(R.string.telegram_connect_success, identity.first)
+                        openBot.visibility = View.VISIBLE
+                        clear.isEnabled = true
                         onChanged()
-                        dialog.dismiss()
-                    } catch (error: Exception) {
-                        val safeMessage = (error.message ?: "Telegram connection failed.")
-                            .replace(token, "[hidden]")
-                            .take(180)
-                        status.text = context.getString(R.string.telegram_connection_failed, safeMessage)
-                        connectButton.isEnabled = true
-                        disconnectButton.isEnabled = existing != null
-                        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = true
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        status.setText(R.string.telegram_connection_failed)
+                        connect.isEnabled = true
+                        clear.isEnabled = store.loadUrl() != null
                     }
                 }
             }
@@ -124,6 +108,43 @@ object TelegramBotSettingsDialog {
         dialog.show()
     }
 
-    private val TOKEN_PATTERN = Regex("^[0-9]+:[A-Za-z0-9_-]{20,}$")
-    private val CHAT_ID_PATTERN = Regex("^-?[0-9]+$")
+    private fun normalizeApiUrl(value: String): String? {
+        val text = value.trim().trimEnd('/')
+        val uri = runCatching { Uri.parse(text) }.getOrNull() ?: return null
+        if (uri.scheme != "https" || uri.host.isNullOrBlank() || uri.userInfo != null ||
+            uri.query != null || uri.fragment != null || uri.path.orEmpty().endsWith("/api/status")) return null
+        return text
+    }
+
+    private fun fetchStatus(baseUrl: String): Pair<String, String> {
+        val connection = URL("$baseUrl/api/status").openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 10_000
+            // Free Render services can take about a minute to wake after inactivity.
+            connection.readTimeout = 90_000
+            connection.setRequestProperty("Accept", "application/json")
+            if (connection.responseCode !in 200..299) throw IllegalStateException("HTTP ${connection.responseCode}")
+            val body = connection.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(body)
+            val username = json.optString("bot_username").removePrefix("@").also {
+                require(BOT_USERNAME_PATTERN.matches(it))
+            }
+            require(json.optString("service") == "k2app" && json.optString("mode") == "webhook")
+            val suppliedBotUrl = json.optString("bot_url")
+            val botUri = Uri.parse(suppliedBotUrl)
+            require(botUri.scheme == "https" && botUri.host == "t.me" && botUri.pathSegments.firstOrNull() == username)
+            return Pair(username, username)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun openTelegramBot(context: Context, botUrl: String) {
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(botUrl)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, R.string.telegram_open_bot_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
 }

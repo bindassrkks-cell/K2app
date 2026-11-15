@@ -15,9 +15,8 @@ import com.deniscerri.ytdl.R
 import com.deniscerri.ytdl.ui.adapter.SortableTextItemAdapter
 import com.deniscerri.ytdl.ui.more.settings.SettingModule
 import com.deniscerri.ytdl.ui.more.settings.SettingHost
-import com.deniscerri.ytdl.util.telegram.TelegramBotConfigStore
+import com.deniscerri.ytdl.util.telegram.TelegramServerConnectionStore
 import com.deniscerri.ytdl.util.telegram.TelegramBotSettingsDialog
-import com.deniscerri.ytdl.service.TelegramPollingService
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlin.collections.indexOf
 
@@ -28,12 +27,8 @@ object AdvancedSettingsModule : SettingModule {
 
         when(pref.key) {
             "telegram_bot_settings" -> {
-                val hasConfig = TelegramBotConfigStore(context).load() != null
-                pref.summary = when {
-                    TelegramPollingService.isRunning -> context.getString(R.string.telegram_polling_status)
-                    hasConfig -> context.getString(R.string.telegram_credentials_saved)
-                    else -> context.getString(R.string.telegram_bot_settings_summary)
-                }
+                val serverUrl = TelegramServerConnectionStore(context).loadUrl()
+                pref.summary = serverUrl ?: context.getString(R.string.telegram_bot_settings_summary)
                 pref.setOnPreferenceClickListener {
                     TelegramBotSettingsDialog.show(host.getHostContext()) { host.refreshUI() }
                     true

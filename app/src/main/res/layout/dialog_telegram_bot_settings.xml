@@ -19,41 +19,20 @@
         android:textSize="14sp" />
 
     <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/telegram_token_layout"
+        android:id="@+id/telegram_server_url_layout"
         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
         app:boxBackgroundColor="@color/k2_ui_surface_high"
         app:boxStrokeColor="@color/k2_ui_accent"
         app:hintTextColor="@color/k2_ui_accent"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="@string/telegram_bot_token"
-        app:helperText="Your token stays encrypted on this device">
+        android:hint="@string/telegram_server_url">
 
         <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/telegram_token_input"
+            android:id="@+id/telegram_server_url_input"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:autofillHints=""
-            android:inputType="textPassword|textNoSuggestions"
-            android:singleLine="true" />
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/telegram_chat_layout"
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-        app:boxBackgroundColor="@color/k2_ui_surface_high"
-        app:boxStrokeColor="@color/k2_ui_accent"
-        app:hintTextColor="@color/k2_ui_accent"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:hint="@string/telegram_chat_id">
-
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/telegram_chat_input"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="numberSigned"
+            android:inputType="textUri"
             android:singleLine="true" />
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -62,8 +41,16 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:text="@string/telegram_polling_status"
         android:textColor="@color/k2_ui_text_secondary"
         android:textSize="13sp"
+        android:visibility="gone" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/telegram_open_bot"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/telegram_open_bot"
         android:visibility="gone" />
 </LinearLayout>
