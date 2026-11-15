@@ -63,6 +63,26 @@ def _format_selector(video: dict[str, Any], audio_formats: list[dict[str, Any]])
     return f"{video_id}+{_format_id(audio)}"
 
 
+def _estimated_format_bytes(fmt: dict[str, Any], duration: float) -> int:
+    for key in ("filesize", "filesize_approx"):
+        size = _number(fmt, key)
+        if size > 0:
+            return int(size)
+    bitrate_kbps = _number(fmt, "tbr") or _number(fmt, "abr")
+    if duration > 0 and bitrate_kbps > 0:
+        return int(bitrate_kbps * 1000 * duration / 8)
+    return 0
+
+
+def _estimated_video_bytes(video: dict[str, Any], audio_formats: list[dict[str, Any]], duration: float) -> int:
+    size = _estimated_format_bytes(video, duration)
+    if not _has_audio(video):
+        audio = next((fmt for fmt in audio_formats if _format_id(fmt)), None)
+        if audio is not None:
+            size += _estimated_format_bytes(audio, duration)
+    return size
+
+
 def build_choices(info: dict[str, Any]) -> list[dict[str, Any]]:
     """Return bounded MP4 resolution, MP3 bitrate, and thumbnail choices."""
     formats = [fmt for fmt in info.get("formats", []) if isinstance(fmt, dict)]
@@ -85,6 +105,7 @@ def build_choices(info: dict[str, Any]) -> list[dict[str, Any]]:
 
     choices: list[dict[str, Any]] = []
     seen_heights: set[int] = set()
+    duration = _number(info, "duration")
     for target in QUALITY_LEVELS:
         candidates = [f for f in video_formats if 0 < int(f["height"]) <= target]
         if not candidates:
@@ -113,6 +134,7 @@ def build_choices(info: dict[str, Any]) -> list[dict[str, Any]]:
             "format_selector": selector,
             "height": height,
             "audio_quality": None,
+            "estimated_size_bytes": _estimated_video_bytes(chosen, audio_formats, duration),
         })
 
     # Keep a video fallback for extractors that expose formats without height metadata.
@@ -128,6 +150,7 @@ def build_choices(info: dict[str, Any]) -> list[dict[str, Any]]:
                     "format_selector": selector,
                     "height": None,
                     "audio_quality": None,
+                    "estimated_size_bytes": _estimated_video_bytes(chosen, audio_formats, duration),
                 })
 
     if audio_formats or video_formats:
@@ -139,6 +162,8 @@ def build_choices(info: dict[str, Any]) -> list[dict[str, Any]]:
                 "format_selector": selector,
                 "height": None,
                 "audio_quality": bitrate,
+                "estimated_size_bytes": _estimated_format_bytes(audio_formats[0], duration)
+                if audio_formats else 0,
             })
 
     thumbnail = info.get("thumbnail")

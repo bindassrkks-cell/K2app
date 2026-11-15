@@ -1,15 +1,24 @@
 # K2App Lite
 
-K2App Lite is a standalone Android application module (`:lite`) with its own application ID (`com.k2app.lite`) and a separate APK workflow. It does not depend on the main K2App application module, downloader engine, or its large native libraries.
+K2App Lite is a standalone Android application module (`:lite`) with application ID `com.k2app.lite` and its own APK workflow. It is independent of the main K2App Android app. It uses a fixed HTTPS API origin in the build configuration; the APK contains no Telegram bot token, admin key or server secret.
 
-The app uses the existing public K2App service at `https://k2app-telegram-bot.onrender.com`. Pair once by sending `/pair` to the K2App Telegram bot and entering its one-use code in Settings. The bearer token is encrypted with Android Keystore and is not embedded in the APK. Pairing is valid for 90 days; pair again after expiry or a server reset.
+## Device session and privacy
 
-Link analysis returns the available choices from the server. Selecting one creates a job and the server delivers the media to the paired Telegram chat. K2 Lite displays the job progress and completed history; it does not download or retain a second copy of the media on the phone. The service currently allows only the configured Telegram owner to use paired Lite API tokens, and its worker processes one media job at a time.
+On first use, the app creates a random anonymous device session through `POST /api/v1/auth/session`. The bearer token is encrypted with Android Keystore and is not included in Android backups. No Telegram pairing or Telegram delivery is used by Lite. Each installation has its own server-side identity and can only read or download its own jobs and files.
 
-Build the debug APK locally with:
+There is no account or recovery method. If app data is cleared or the app is reinstalled, its session cannot be recovered. **Reset session** revokes that device token and deletes that session’s server-side jobs and files; media already saved on the phone remains.
+
+## Downloads
+
+The app submits a public media URL, shows available formats and asks the server to prepare the selected file. It then uses Android DownloadManager with the session bearer token to save the result under the app’s device Downloads area, where it can be opened from the Lite library. The server returns one final file per job, caps Lite source/result data at 300 MB and expires server-side jobs after six hours. Each session can analyze five links per hour, and the service creates at most 100 new sessions per hour across all devices. The worker processes one media job at a time. Availability still depends on the public source site and formats it exposes.
+
+The anonymous API implementation is included in the K2App Lite review branch. The configured Render service must be updated with that backend code before this APK can create anonymous sessions and serve direct files. The Lite PR is intentionally not merged or deployed by this change.
+
+## Build
 
 ```sh
 ./gradlew :lite:assembleDebug
+./gradlew :lite:assembleRelease
 ```
 
-The resulting installable APK is written to `lite/build/outputs/apk/debug/lite-debug.apk`. The dedicated GitHub Actions workflow builds only this module and publishes the APK as the `K2App-Lite-debug` artifact.
+The installable debug APK is written to `lite/build/outputs/apk/debug/lite-debug.apk`. The dedicated GitHub Actions workflow builds only this module and publishes the APK as the `K2App-Lite-debug` artifact.

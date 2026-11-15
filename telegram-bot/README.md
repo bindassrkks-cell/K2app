@@ -12,21 +12,20 @@ The selector can only offer formats exposed by the source. yt-dlp-supported publ
 
 ## K2App Lite API
 
-The API is designed for the Lite client to request a chooser or start a selected download that is delivered to the owner's Telegram chat. It does not expose unauthenticated media files. Pair the Lite client first:
+K2App Lite uses a direct, anonymous device session. Its API jobs and downloadable files are isolated by a random per-installation identity. This flow does not send Lite downloads to Telegram and does not share the bot owner's identity. The Telegram bot and its owner-only commands remain separate. The former `/api/v1/auth/pair` endpoint returns `410 Gone`.
 
-1. Send `/pair` to the private bot. It returns a random code valid for five minutes and one use.
-2. The Lite client exchanges the code once:
+Create an anonymous session:
 
 ```http
-POST /api/v1/auth/pair
+POST /api/v1/auth/session
 Content-Type: application/json
 
-{"code":"<one-time-code>"}
+{}
 ```
 
-The response contains an `access_token` (Bearer token) valid for 90 days. Store it securely in the app and do not include a fixed server credential in the APK. The server stores only a hash of the issued token.
+The response contains a random Bearer `access_token` valid for 90 days. The server stores only its hash. The Android app encrypts the token with Android Keystore and excludes it from backups; there is no login or account recovery if app data is cleared or the app is reinstalled. `GET /api/v1/auth/session` validates the saved token. `POST /api/v1/auth/revoke` ends the session and deletes only that session's server-side jobs and result files; files already saved on the phone remain.
 
-Create a media job and obtain options plus a Telegram deep link:
+Create a media job and obtain available choices:
 
 ```http
 POST /api/v1/jobs
@@ -36,7 +35,7 @@ Content-Type: application/json
 {"url":"https://public.example/video"}
 ```
 
-The response includes `job_id`, `status: "chooser_ready"`, metadata, the indexed `choices` array, and `chooser_url`. Opening `chooser_url` sends the user to the bot's inline chooser. To start a choice directly from the app, post its zero-based index:
+The response includes `job_id`, `status: "chooser_ready"`, bounded media metadata and an indexed `choices` array with optional size estimates. To start a choice directly from the app, post its zero-based index:
 
 ```http
 POST /api/v1/jobs/<job_id>/choose
@@ -46,9 +45,9 @@ Content-Type: application/json
 {"choice_index":0}
 ```
 
-Poll status with `GET /api/v1/jobs/<job_id>` and the same Bearer token. Job states include `chooser_ready`, `queued`, `downloading`, `preparing`, `uploading`, `done`, and `failed`; `progress` is an integer from 0 to 100. Job sessions expire after 30 minutes. A token expires after 90 days and requires pairing again. Since Render Free has ephemeral storage, a restart can invalidate existing tokens and jobs; the user can pair again with `/pair`.
+Poll `GET /api/v1/jobs/<job_id>` with the same Bearer token. States include `chooser_ready`, `queued`, `downloading`, `preparing`, `done` and `failed`; `progress` is an integer from 0 to 100. A completed response includes an authenticated relative `download_url` for each result. The app's Android DownloadManager sends the same Bearer token when it streams that file to the phone. A different session cannot inspect, choose, revoke or download another session's jobs/files.
 
-Only the configured bot owner can create and receive jobs. The API accepts public HTTP(S) URLs, bounds request sizes, checks private/reserved destinations during DNS resolution, and returns only an allowlisted set of media metadata and format fields.
+Lite sessions can analyze up to five links per hour. Session issuance is capped globally at 100 new sessions per hour across all devices. Lite source and result data are capped at 300 MB, server-side jobs/files expire after six hours, and the media worker processes one job at a time. The API accepts only public HTTP(S) media URLs, bounds request bodies, blocks private/reserved DNS destinations and returns only allowlisted media metadata and format fields. Render Free storage is ephemeral, so a restart can invalidate sessions and jobs; the app can create a new anonymous session, but old server jobs cannot be recovered.
 
 ## Webhook deployment
 

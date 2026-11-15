@@ -20,8 +20,8 @@ from fastapi.responses import JSONResponse
 
 from bot import (
     BotState, Config, ConfigurationError, K2TelegramBot, TelegramApi,
-    _resolve_media_with_deadline, is_safe_http_url,
 )
+from lite_api import LiteApiStore, cleanup_loop, router as lite_api_router
 
 LOGGER = logging.getLogger("k2app.telegram_webhook")
 MAX_BODY_BYTES = 1_000_000
@@ -29,7 +29,6 @@ MAX_PENDING_UPDATES = 100
 PROCESSING_TIMEOUT_SECONDS = 840
 DONE_UPDATE_RETENTION = 1000
 WEBHOOK_PATH = "/telegram/webhook"
-LITE_REQUEST_MAX_BYTES = 8192
 
 
 def _valid_update(value: Any) -> bool:
@@ -131,8 +130,24 @@ async def lifespan(app: FastAPI):
     bot = K2TelegramBot(config, state, api)
     app.state.bot = bot
     app.state.bot_state = state
+    lite_db_path = Path(os.getenv("LITE_API_DB_FILE") or config.state_file.with_name("k2app-lite-api.sqlite3"))
+    lite_output_dir = Path(os.getenv("LITE_DOWNLOAD_DIR") or config.state_file.parent / "lite-downloads")
+    lite_output_dir.mkdir(parents=True, exist_ok=True)
+    lite_store = LiteApiStore(lite_db_path)
+    lite_store.recover_interrupted(lite_output_dir)
+    app.state.lite_store = lite_store
+    app.state.lite_output_dir = lite_output_dir
+    app.state.lite_config = config
+    app.state.lite_analysis_lock = asyncio.Lock()
+    app.state.media_worker_lock = asyncio.Lock()
+    bot._download_lock = app.state.media_worker_lock
+    app.state.api_job_reserved = False
+    app.state.api_job_reserved_job = None
     app.state.job_tasks = {}
     stop = asyncio.Event()
+    cleanup_task = asyncio.create_task(
+        cleanup_loop(lite_store, lite_output_dir, stop), name="lite-expiry-cleanup"
+    )
     app.state.status = {"service": "k2app", "mode": "webhook", "bot_username": username or None, "bot_url": link}
 
     async def worker():
@@ -179,10 +194,8 @@ async def lifespan(app: FastAPI):
     finally:
         stop.set()
         task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+        cleanup_task.cancel()
+        await asyncio.gather(task, cleanup_task, return_exceptions=True)
         jobs = set(getattr(app.state, "job_tasks", {}).values())
         jobs.update(getattr(bot, "_background_downloads", set()))
         for job_task in jobs:
@@ -193,179 +206,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+app.include_router(lite_api_router)
 
 
 @app.get("/health")
 @app.get("/api/status")
 async def public_status(request: Request):
     return getattr(request.app.state, "status", {"service": "k2app", "mode": "webhook", "bot_username": None, "bot_url": None})
-
-
-def _require_lite_auth(request: Request) -> str:
-    authorization = request.headers.get("Authorization", "")
-    supplied = authorization[7:].strip() if authorization.startswith("Bearer ") else ""
-    state = getattr(request.app.state, "bot_state", None)
-    if not supplied or state is None:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    chat_id = state.authenticate_api_token(supplied)
-    if chat_id is None or chat_id != state.owner_chat_id():
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    return chat_id
-
-
-async def _read_lite_json(request: Request) -> dict:
-    length = request.headers.get("content-length")
-    if length:
-        try:
-            if int(length) > LITE_REQUEST_MAX_BYTES:
-                raise HTTPException(status_code=413, detail="Request too large")
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid content length") from None
-    body = await request.body()
-    if len(body) > LITE_REQUEST_MAX_BYTES:
-        raise HTTPException(status_code=413, detail="Request too large")
-    try:
-        value = json.loads(body)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        raise HTTPException(status_code=400, detail="Invalid JSON") from None
-    if not isinstance(value, dict):
-        raise HTTPException(status_code=400, detail="JSON object required")
-    return value
-
-
-@app.post("/api/v1/auth/pair")
-async def pair_lite_device(request: Request):
-    body = await _read_lite_json(request)
-    code = body.get("code")
-    if not isinstance(code, str) or not re.fullmatch(r"[A-Za-z0-9_-]{8,32}", code):
-        raise HTTPException(status_code=400, detail="A valid one-time pairing code is required")
-    state = getattr(request.app.state, "bot_state", None)
-    if state is None:
-        raise HTTPException(status_code=503, detail="Bot is not ready")
-    paired = state.exchange_api_pair_code(code)
-    if paired is None or paired[0] != state.owner_chat_id():
-        raise HTTPException(status_code=401, detail="Pairing code is invalid, expired, or already used")
-    return JSONResponse(
-        {"access_token": paired[1], "token_type": "Bearer", "expires_in_seconds": 90 * 86400},
-        headers={"Cache-Control": "no-store"},
-    )
-
-
-@app.post("/api/v1/jobs", status_code=202)
-async def create_lite_job(request: Request):
-    _require_lite_auth(request)
-    body = await _read_lite_json(request)
-    url = body.get("url")
-    if not isinstance(url, str) or len(url) > 2048 or not is_safe_http_url(url):
-        raise HTTPException(status_code=400, detail="A public http(s) media URL is required")
-    state = getattr(request.app.state, "bot_state", None)
-    if state is None:
-        raise HTTPException(status_code=503, detail="Bot is not ready")
-    owner = state.owner_chat_id()
-    if owner is None:
-        raise HTTPException(status_code=503, detail="Telegram owner is not configured")
-    try:
-        media = await _resolve_media_with_deadline(url)
-    except TimeoutError:
-        raise HTTPException(status_code=504, detail="Media lookup timed out") from None
-    except Exception:
-        raise HTTPException(status_code=422, detail="This URL could not be inspected") from None
-    media["url"] = url
-    job_id = state.save_media_choices(owner, media)
-    status = getattr(request.app.state, "status", {})
-    bot_url = status.get("bot_url")
-    chooser_url = f"{bot_url}?start=dl_{job_id}" if bot_url else None
-    return {
-        "job_id": job_id,
-        "status": "chooser_ready",
-        "expires_in_seconds": 1800,
-        "media": {
-            "title": media.get("title"),
-            "duration_seconds": media.get("duration_seconds"),
-            "thumbnail_url": media.get("thumbnail_url"),
-        },
-        "choices": media.get("choices", []),
-        "chooser_url": chooser_url,
-    }
-
-
-@app.get("/api/v1/jobs/{job_id}")
-async def get_lite_job(job_id: str, request: Request):
-    _require_lite_auth(request)
-    if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", job_id):
-        raise HTTPException(status_code=404, detail="Job not found")
-    state = getattr(request.app.state, "bot_state", None)
-    if state is None:
-        raise HTTPException(status_code=503, detail="Bot is not ready")
-    owner = state.owner_chat_id()
-    job = state.media_job_status(job_id, owner or "")
-    media = state.get_media_choices(job_id, owner or "")
-    if job is None or media is None:
-        raise HTTPException(status_code=404, detail="Job not found or expired")
-    return {
-        "job_id": job_id,
-        **job,
-        "media": {
-            "title": media.get("title"),
-            "duration_seconds": media.get("duration_seconds"),
-            "thumbnail_url": media.get("thumbnail_url"),
-        },
-        "choices": media.get("choices", []),
-    }
-
-
-@app.post("/api/v1/jobs/{job_id}/choose", status_code=202)
-async def choose_lite_job(job_id: str, request: Request):
-    _require_lite_auth(request)
-    if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", job_id):
-        raise HTTPException(status_code=404, detail="Job not found")
-    body = await _read_lite_json(request)
-    choice_index = body.get("choice_index")
-    if not isinstance(choice_index, int) or isinstance(choice_index, bool) or not 0 <= choice_index < 10:
-        raise HTTPException(status_code=400, detail="choice_index must be an integer from 0 to 9")
-    state = getattr(request.app.state, "bot_state", None)
-    bot = getattr(request.app.state, "bot", None)
-    if state is None or bot is None:
-        raise HTTPException(status_code=503, detail="Bot is not ready")
-    owner = state.owner_chat_id()
-    if owner is None:
-        raise HTTPException(status_code=503, detail="Telegram owner is not configured")
-    if bot.has_active_download():
-        raise HTTPException(status_code=429, detail="Another media job is already running")
-    selected = state.consume_media_choice(job_id, owner, choice_index)
-    if selected is None:
-        raise HTTPException(status_code=409, detail="Job is missing, expired, or already selected")
-    media, choice = selected
-    if choice.get("kind") == "thumbnail":
-        thumbnail = media.get("thumbnail_url")
-        if not isinstance(thumbnail, str):
-            state.set_media_job_status(job_id, "failed", 0, "Thumbnail unavailable")
-            raise HTTPException(status_code=422, detail="Thumbnail unavailable")
-        try:
-            await bot.api.send_photo_url(owner, thumbnail, f"Thumbnail: {str(media.get('title') or 'Media')[:160]}")
-            state.set_media_job_status(job_id, "done", 100, "Thumbnail sent")
-            return {"job_id": job_id, "status": "done", "progress": 100}
-        except Exception:
-            state.set_media_job_status(job_id, "failed", 0, "Thumbnail delivery failed")
-            raise HTTPException(status_code=502, detail="Thumbnail delivery failed") from None
-    task = bot.start_background_download(owner, job_id, media, choice)
-    if task is None:
-        state.set_media_job_status(job_id, "failed", 0, "Another media job is active")
-        raise HTTPException(status_code=429, detail="Another media job is already running")
-    request.app.state.job_tasks[job_id] = task
-
-    def _forget_task(done_task):
-        request.app.state.job_tasks.pop(job_id, None)
-        try:
-            error = done_task.exception()
-        except asyncio.CancelledError:
-            return
-        if error:
-            LOGGER.warning("Lite job task failed (job_id=%s,error_type=%s)", job_id, type(error).__name__)
-
-    task.add_done_callback(_forget_task)
-    return {"job_id": job_id, "status": "queued", "progress": 0}
-
 
 @app.post(WEBHOOK_PATH)
 async def telegram_webhook(request: Request):

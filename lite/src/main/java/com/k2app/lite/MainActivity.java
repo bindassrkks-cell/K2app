@@ -5,7 +5,9 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.app.DownloadManager;
 import android.content.res.ColorStateList;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -14,6 +16,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
 import android.net.Uri;
+import android.os.Environment;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -45,6 +48,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.io.File;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
@@ -86,13 +90,12 @@ public final class MainActivity extends AppCompatActivity {
     private String selectedKind = "video";
     private String pendingUrl = "";
     private String homeMessage = "";
-    private String pairingMessage = "";
-    private String botUrl = "https://t.me/x_amtop_bot";
-    private String botUsername = "x_amtop_bot";
+    private String sessionMessage = "";
+    private String apiStatus = "Checking...";
+    private String sessionStatus = "Setting up...";
     private JSONObject pendingJob;
     private JSONArray pendingChoices;
     private TextInputEditText urlInput;
-    private TextInputEditText pairingInput;
     private FrameLayout contentFrame;
     private BottomNavigationView bottomNavigation;
     private LiteApi api;
@@ -138,7 +141,8 @@ public final class MainActivity extends AppCompatActivity {
         String sharedText = getSharedMediaText(getIntent());
         if (!TextUtils.isEmpty(sharedText)) pendingUrl = sharedText;
         render();
-        fetchServiceIdentity();
+        refreshServiceStatus();
+        initializeDeviceSession();
     }
 
     @Override
@@ -292,6 +296,10 @@ public final class MainActivity extends AppCompatActivity {
         MaterialButton analyze = primaryButton("Analyze link");
         analyze.setOnClickListener(v -> analyzeLink(urlInput == null ? "" : String.valueOf(urlInput.getText())));
         entry.addView(analyze, matchWrap());
+        addSpace(entry, 9);
+        TextView destination = label("☁   →   ▣   Direct to your phone", 13, MUTED, false);
+        destination.setGravity(Gravity.CENTER);
+        entry.addView(destination, matchWrap());
         addSpace(entry, 10);
         TextView paste = label("▣   Link copied? Paste it here", 14, MUTED, false);
         paste.setPadding(dp(8), dp(10), dp(8), dp(8));
@@ -354,7 +362,7 @@ public final class MainActivity extends AppCompatActivity {
         LinearLayout detail = newColumn();
         detail.addView(label(record.title, 16, TEXT, true), matchWrap());
         addSpace(detail, 4);
-        detail.addView(label(record.isCompleted() ? "Ready in Telegram" : friendlyStatus(record), 13,
+        detail.addView(label(record.isCompleted() ? "Ready on device" : friendlyStatus(record), 13,
                 record.isCompleted() ? LIME : MUTED, false), matchWrap());
         row.addView(detail, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         card.addView(row);
@@ -432,9 +440,14 @@ public final class MainActivity extends AppCompatActivity {
             column.addView(label("No options of this type are available for this link.", 14, MUTED, false), matchWrap());
         }
         addSpace(column, 8);
-        column.addView(label("Files are delivered to your paired Telegram chat.", 13, MUTED, false), matchWrap());
+        JSONObject selected = pendingChoices == null ? null : pendingChoices.optJSONObject(selectedChoice);
+        long estimatedBytes = selected == null ? 0L : selected.optLong("estimated_size_bytes", 0L);
+        String estimate = estimatedBytes > 0
+                ? "Estimated size · " + formatBytes(estimatedBytes)
+                : "Estimated size may vary";
+        column.addView(label(estimate, 13, MUTED, false), matchWrap());
         addSpace(column, 14);
-        MaterialButton start = primaryButton("↓   Start download");
+        MaterialButton start = primaryButton("↓   Download to device");
         start.setOnClickListener(v -> startSelectedDownload());
         column.addView(start, matchWrap());
         addSpace(column, 12);
@@ -472,6 +485,8 @@ public final class MainActivity extends AppCompatActivity {
         detail.addView(label(choiceLabel, 16, TEXT, true), matchWrap());
         String sub = "thumbnail".equals(choice.optString("kind"))
                 ? "Image" : choice.optString("kind", "video").equals("audio") ? "MP3 audio" : videoDetail(choice);
+        long estimatedBytes = choice.optLong("estimated_size_bytes", 0L);
+        if (estimatedBytes > 0L) sub += " · " + formatBytes(estimatedBytes);
         addSpace(detail, 4);
         detail.addView(label(sub, 13, MUTED, false), matchWrap());
         row.addView(detail, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -531,12 +546,12 @@ public final class MainActivity extends AppCompatActivity {
             empty.addView(label(completedTab ? "Nothing completed yet" : "No active downloads", 17, TEXT, true), matchWrap());
             addSpace(empty, 5);
             empty.addView(label(completedTab
-                    ? "Finished transfers will appear here. Your files are delivered by the Telegram bot."
+                    ? "Files saved on this phone will appear here."
                     : "Paste a link on Home to start a transfer.", 14, MUTED, false), matchWrap());
             column.addView(emptyCard, matchWrap());
         }
         addSpace(column, 8);
-        column.addView(label("The Telegram bot processes one media job at a time.", 12, MUTED, false), matchWrap());
+        column.addView(label("Media is prepared by the K2App API and saved on this phone.", 12, MUTED, false), matchWrap());
         return scroll;
     }
 
@@ -575,9 +590,13 @@ public final class MainActivity extends AppCompatActivity {
         }
         if (record.isCompleted()) {
             addSpace(content, 11);
-            TextView delivery = label("Sent to Telegram · open @" + botUsername, 13, LIME, true);
-            delivery.setOnClickListener(v -> openTelegram());
-            content.addView(delivery, matchWrap());
+            LinearLayout savedRow = newRow();
+            savedRow.addView(label("✓  Saved on device", 13, LIME, true),
+                    new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            MaterialButton open = smallTextButton("Open", true);
+            open.setOnClickListener(v -> openLocalFile(record));
+            savedRow.addView(open, wrap());
+            content.addView(savedRow, matchWrap());
         }
         return outer;
     }
@@ -599,12 +618,9 @@ public final class MainActivity extends AppCompatActivity {
         qualityButton.setOnClickListener(v -> cycleQuality());
         downloadSettings.addView(qualityButton, matchWrap());
         addDivider(downloadSettings);
-        View deliveryButton = settingRow("▱", "Delivery", "Telegram");
-        deliveryButton.setOnClickListener(v -> new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Telegram delivery")
-                .setMessage("The K2App server sends the finished media directly to your paired Telegram chat. K2 Lite tracks the job; it does not keep a second copy of the media on this phone.")
-                .setPositiveButton("Got it", null).show());
-        downloadSettings.addView(deliveryButton, matchWrap());
+        View saveTo = settingRow("▤", "Save to", "App downloads");
+        saveTo.setOnClickListener(v -> showToast("Files are saved on this phone and opened from the K2App Lite library."));
+        downloadSettings.addView(saveTo, matchWrap());
         addDivider(downloadSettings);
         LinearLayout wifiRow = newRow();
         TextView wifiIcon = label("◉", 21, MUTED, true);
@@ -623,50 +639,33 @@ public final class MainActivity extends AppCompatActivity {
         column.addView(downloadCard, matchWrap());
 
         addSpace(column, 22);
-        column.addView(sectionHeading("TELEGRAM PAIRING"), matchWrap());
+        column.addView(sectionHeading("SERVER API"), matchWrap());
         addSpace(column, 9);
-        MaterialCardView pairingCard = card();
-        LinearLayout pairing = paddedColumn(16);
-        pairingCard.addView(pairing);
+        MaterialCardView apiCard = card();
+        LinearLayout serverSettings = paddedColumn(16);
+        apiCard.addView(serverSettings);
         String storedToken = tokenStore.read();
-        TextView connection = label(storedToken == null ? "Not connected" : "●  Connected to @" + botUsername,
-                16, storedToken == null ? MUTED : LIME, true);
-        pairing.addView(connection, matchWrap());
-        addSpace(pairing, 6);
-        pairing.addView(label("Send /pair to @" + botUsername + " in Telegram. Enter the one-use code here within 5 minutes.",
-                13, MUTED, false), matchWrap());
-        addSpace(pairing, 12);
-        TextInputLayout codeLayout = new TextInputLayout(this);
-        codeLayout.setHint("One-time pairing code");
-        codeLayout.setBoxBackgroundMode(TextInputLayout.BOX_BACKGROUND_OUTLINE);
-        codeLayout.setBoxStrokeColor(OUTLINE);
-        codeLayout.setHintTextColor(ColorStateList.valueOf(MUTED));
-        codeLayout.setBoxCornerRadii(dp(18), dp(18), dp(18), dp(18));
-        pairingInput = new TextInputEditText(codeLayout.getContext());
-        pairingInput.setSingleLine(true);
-        pairingInput.setTextColor(TEXT);
-        pairingInput.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-        pairingInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                | android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
-        codeLayout.addView(pairingInput, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        pairing.addView(codeLayout, matchWrap());
-        addSpace(pairing, 10);
-        MaterialButton pairButton = primaryButton(storedToken == null ? "Connect Telegram" : "Pair another device");
-        pairButton.setOnClickListener(v -> pairDevice());
-        pairing.addView(pairButton, matchWrap());
-        if (!TextUtils.isEmpty(pairingMessage)) {
-            addSpace(pairing, 8);
-            pairing.addView(label(pairingMessage, 13, ERROR, false), matchWrap());
+        View apiRow = settingRow("☁", "API status", apiStatus);
+        apiRow.setOnClickListener(v -> refreshServiceStatus());
+        serverSettings.addView(apiRow, matchWrap());
+        addDivider(serverSettings);
+        View sessionRow = settingRow("▯", "Device session",
+                storedToken == null ? "Setting up..." : sessionStatus);
+        serverSettings.addView(sessionRow, matchWrap());
+        addSpace(serverSettings, 10);
+        MaterialButton resetSession = primaryButton(storedToken == null ? "Create device session" : "Reset session");
+        resetSession.setOnClickListener(v -> {
+            if (tokenStore.read() == null) initializeDeviceSession();
+            else confirmDisconnect();
+        });
+        serverSettings.addView(resetSession, matchWrap());
+        addSpace(serverSettings, 7);
+        serverSettings.addView(label("Anonymous session · no account recovery", 12, MUTED, false), matchWrap());
+        if (!TextUtils.isEmpty(sessionMessage)) {
+            addSpace(serverSettings, 7);
+            serverSettings.addView(label(sessionMessage, 13, ERROR, false), matchWrap());
         }
-        if (storedToken != null) {
-            addSpace(pairing, 6);
-            TextView disconnect = label("Disconnect this device", 13, MUTED, false);
-            disconnect.setPadding(0, dp(8), 0, dp(4));
-            disconnect.setOnClickListener(v -> confirmDisconnect());
-            pairing.addView(disconnect, matchWrap());
-        }
-        column.addView(pairingCard, matchWrap());
+        column.addView(apiCard, matchWrap());
 
         addSpace(column, 22);
         column.addView(sectionHeading("APP"), matchWrap());
@@ -687,7 +686,7 @@ public final class MainActivity extends AppCompatActivity {
         View about = settingRow("ⓘ", "About K2App Lite", "v" + BuildConfig.VERSION_NAME);
         about.setOnClickListener(v -> new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("K2App Lite")
-                .setMessage("A lightweight Material 3 client for the K2App Telegram media service. Pair with the bot to analyze public links, select an available format and follow delivery status.")
+                .setMessage("A lightweight Material 3 client for the K2App public API. Analyze a public link, choose a format and save the finished file directly on this phone.")
                 .setPositiveButton("Close", null).show());
         appSettings.addView(about, matchWrap());
         column.addView(appCard, matchWrap());
@@ -733,29 +732,32 @@ public final class MainActivity extends AppCompatActivity {
             render();
             return;
         }
-        String token = tokenStore.read();
-        if (token == null) {
-            pairingMessage = "Pair with the Telegram bot before analyzing a link.";
-            section = Section.SETTINGS;
-            showingOptions = false;
-            render();
-            return;
-        }
         if (preferences.getBoolean(WIFI_ONLY_KEY, true) && !isOnWifi()) {
             homeMessage = "Wi-Fi only is on. Connect to Wi-Fi or switch it off in Settings.";
             render();
             return;
         }
         pendingUrl = value;
-        homeMessage = "Checking available formats…";
+        homeMessage = "Connecting securely and checking formats…";
         render();
         io.execute(() -> {
             try {
-                JSONObject result = api.analyze(value, token);
+                String token = ensureDeviceSession();
+                JSONObject result;
+                try {
+                    result = api.analyze(value, token);
+                } catch (LiteApi.ApiException expired) {
+                    if (expired.statusCode != 401) throw expired;
+                    token = createDeviceSession();
+                    result = api.analyze(value, token);
+                }
+                JSONObject analyzed = result;
                 runOnUiThread(() -> {
+                    sessionStatus = "Active on this phone";
+                    sessionMessage = "";
                     homeMessage = "";
-                    pendingJob = result;
-                    pendingChoices = result.optJSONArray("choices");
+                    pendingJob = analyzed;
+                    pendingChoices = analyzed.optJSONArray("choices");
                     selectedKind = firstAvailableKind(pendingChoices);
                     selectedChoice = preferredChoice(pendingChoices, preferences.getString(QUALITY_KEY, "720p"));
                     showingOptions = true;
@@ -767,9 +769,11 @@ public final class MainActivity extends AppCompatActivity {
                     if (failure instanceof LiteApi.ApiException
                             && ((LiteApi.ApiException) failure).statusCode == 401) {
                         tokenStore.clear();
-                        homeMessage = "Pairing expired. Reconnect in Settings.";
+                        sessionStatus = "Setting up...";
+                        homeMessage = "Device session expired. Try analyzing the link again.";
                     }
                     render();
+                    if (tokenStore.read() == null) initializeDeviceSession();
                 });
             }
         });
@@ -785,9 +789,12 @@ public final class MainActivity extends AppCompatActivity {
         if (token == null) {
             showingOptions = false;
             section = Section.SETTINGS;
+            sessionMessage = "Setting up a device session…";
             render();
+            initializeDeviceSession();
             return;
         }
+        final int choiceIndex = selectedChoice;
         JSONObject choice = pendingChoices.optJSONObject(selectedChoice);
         String choiceLabel = choice == null ? "Media" : choice.optString("label", "Media");
         String jobId = pendingJob.optString("job_id", "");
@@ -795,15 +802,18 @@ public final class MainActivity extends AppCompatActivity {
             showToast("The service did not return a job ID. Please try again.");
             return;
         }
-        MaterialButton sourceButton = null;
+        final String sourceUrl = pendingUrl;
         hideKeyboard();
         io.execute(() -> {
             try {
-                api.choose(jobId, selectedChoice, token);
+                JSONObject accepted = api.choose(jobId, choiceIndex, token);
+                String queuedStatus = accepted.optString("status", "queued");
                 runOnUiThread(() -> {
                     JSONObject media = pendingJob == null ? null : pendingJob.optJSONObject("media");
                     String title = media == null ? "Media" : media.optString("title", "Media");
-                    DownloadRecord record = new DownloadRecord(jobId, title, pendingUrl, choiceLabel);
+                    DownloadRecord record = new DownloadRecord(jobId, title, sourceUrl, choiceLabel);
+                    record.status = queuedStatus;
+                    record.statusText = "Waiting for the server";
                     jobs.removeIf(existing -> existing.jobId.equals(jobId));
                     jobs.add(0, record);
                     saveJobs();
@@ -811,65 +821,85 @@ public final class MainActivity extends AppCompatActivity {
                     section = Section.DOWNLOADS;
                     completedTab = false;
                     render();
-                    showToast("Added to the Telegram delivery queue.");
+                    showToast("Added to the K2App server queue.");
                     schedulePoll(1_000);
                 });
             } catch (Exception failure) {
-                runOnUiThread(() -> showToast(safeMessage(failure)));
+                runOnUiThread(() -> {
+                    if (failure instanceof LiteApi.ApiException
+                            && ((LiteApi.ApiException) failure).statusCode == 401) {
+                        tokenStore.clear();
+                        sessionStatus = "Setting up...";
+                        sessionMessage = "Session expired. Analyze the link again.";
+                        initializeDeviceSession();
+                    }
+                    showToast(safeMessage(failure));
+                });
             }
         });
     }
 
-    private void pairDevice() {
-        if (pairingInput == null) return;
-        String code = String.valueOf(pairingInput.getText()).trim();
-        if (code.isEmpty()) {
-            pairingMessage = "Enter the one-time code from Telegram.";
-            render();
-            return;
-        }
-        if (preferences.getBoolean(WIFI_ONLY_KEY, true) && !isOnWifi()) {
-            pairingMessage = "Wi-Fi only is on. Connect to Wi-Fi or switch it off above.";
-            render();
-            return;
-        }
-        pairingMessage = "Connecting securely…";
-        render();
+    private void initializeDeviceSession() {
+        if (tokenStore == null) return;
+        sessionStatus = "Setting up...";
         io.execute(() -> {
             try {
-                JSONObject response = api.pair(code);
-                String accessToken = response.optString("access_token", "");
-                if (accessToken.isEmpty()) throw new IOException("The service did not return an access token.");
-                tokenStore.save(accessToken);
+                ensureDeviceSession();
                 runOnUiThread(() -> {
-                    pairingMessage = "Device paired successfully.";
-                    render();
-                    showToast("K2 Lite is connected.");
+                    sessionStatus = "Active on this phone";
+                    sessionMessage = "";
+                    if (section == Section.SETTINGS && !showingOptions) render();
+                    schedulePoll(1_000);
                 });
             } catch (Exception failure) {
                 runOnUiThread(() -> {
-                    pairingMessage = safeMessage(failure);
-                    render();
+                    sessionStatus = "Unavailable";
+                    sessionMessage = safeMessage(failure);
+                    if (section == Section.SETTINGS && !showingOptions) render();
                 });
             }
         });
     }
 
-    private void fetchServiceIdentity() {
+    private void refreshServiceStatus() {
+        apiStatus = "Checking...";
+        if (section == Section.SETTINGS && !showingOptions) render();
         io.execute(() -> {
             try {
-                JSONObject status = api.serviceStatus();
-                String receivedUrl = status.optString("bot_url", "");
-                String receivedName = status.optString("bot_username", "");
-                if (!receivedUrl.isEmpty() && receivedUrl.startsWith("https://t.me/")) botUrl = receivedUrl;
-                if (!receivedName.isEmpty()) botUsername = receivedName;
+                api.serviceStatus();
                 runOnUiThread(() -> {
+                    apiStatus = "Connected securely";
                     if (section == Section.SETTINGS && !showingOptions) render();
                 });
-            } catch (Exception ignored) {
-                // Keep the known public bot link as a graceful offline fallback.
+            } catch (Exception failure) {
+                runOnUiThread(() -> {
+                    apiStatus = "Unavailable · tap to retry";
+                    if (section == Section.SETTINGS && !showingOptions) render();
+                });
             }
         });
+    }
+
+    private String ensureDeviceSession() throws Exception {
+        String token = tokenStore.read();
+        if (!TextUtils.isEmpty(token)) {
+            try {
+                api.inspectSession(token);
+                return token;
+            } catch (LiteApi.ApiException expired) {
+                if (expired.statusCode != 401) throw expired;
+                tokenStore.clear();
+            }
+        }
+        return createDeviceSession();
+    }
+
+    private String createDeviceSession() throws Exception {
+        JSONObject response = api.createSession();
+        String accessToken = response.optString("access_token", "");
+        if (accessToken.isEmpty()) throw new IOException("The service did not return a device session.");
+        tokenStore.save(accessToken);
+        return accessToken;
     }
 
     private void schedulePoll(long delayMs) {
@@ -883,62 +913,260 @@ public final class MainActivity extends AppCompatActivity {
         String token = tokenStore.read();
         if (token == null) return;
         List<DownloadRecord> active = new ArrayList<>();
-        for (DownloadRecord job : jobs) if (!job.isCompleted()) active.add(job);
+        for (DownloadRecord job : jobs) if (!job.isTerminal()) active.add(job);
         if (active.isEmpty()) return;
         pollInFlight = true;
         io.execute(() -> {
             boolean tokenExpired = false;
             for (DownloadRecord record : active) {
                 try {
+                    if ("saving".equalsIgnoreCase(record.status)) {
+                        updateDeviceDownload(record);
+                        continue;
+                    }
                     JSONObject response = api.job(record.jobId, token);
                     record.status = response.optString("status", record.status);
                     record.progress = Math.max(0, Math.min(100, response.optInt("progress", record.progress)));
                     record.statusText = response.optString("status_text", record.statusText);
                     if ("done".equalsIgnoreCase(record.status)) {
-                        record.progress = 100;
-                        if (TextUtils.isEmpty(record.statusText)) record.statusText = "Ready in your Telegram chat.";
+                        queueDeviceDownload(record, response, token);
+                    } else if ("failed".equalsIgnoreCase(record.status)) {
+                        record.progress = 0;
                     }
                 } catch (LiteApi.ApiException failure) {
                     if (failure.statusCode == 401) {
                         tokenExpired = true;
                         break;
                     }
-                    if (failure.statusCode == 404) record.statusText = "Job expired on the service. You can remove it from history.";
-                } catch (Exception ignored) {
-                    // Keep the latest known progress; the next foreground poll will retry.
+                    if (failure.statusCode == 404) {
+                        record.status = "failed";
+                        record.progress = 0;
+                        record.statusText = "This server job expired. Analyze the link again to restart.";
+                    }
+                } catch (Exception failure) {
+                    if ("done".equalsIgnoreCase(record.status) && record.downloadId <= 0) {
+                        record.status = "failed";
+                        record.statusText = safeMessage(failure);
+                    }
+                    // Keep the latest server or device progress if a poll has a transient error.
+                }
+            }
+            if (tokenExpired) {
+                tokenStore.clear();
+                for (DownloadRecord record : active) {
+                    if (!"saving".equalsIgnoreCase(record.status)) {
+                        record.status = "failed";
+                        record.progress = 0;
+                        record.statusText = "Device session expired. Analyze the source link again.";
+                    }
+                }
+                try {
+                    createDeviceSession();
+                    sessionStatus = "Active on this phone";
+                    sessionMessage = "";
+                } catch (Exception failure) {
+                    sessionStatus = "Unavailable";
+                    sessionMessage = safeMessage(failure);
                 }
             }
             final boolean expired = tokenExpired;
-            if (expired) tokenStore.clear();
             saveJobs();
             runOnUiThread(() -> {
                 pollInFlight = false;
-                if (expired && section == Section.SETTINGS) {
-                    pairingMessage = "Pairing expired. Send /pair to the bot and connect again.";
-                }
-                if (section == Section.DOWNLOADS && !showingOptions) render();
+                if (expired && section == Section.SETTINGS) render();
+                if ((section == Section.DOWNLOADS || section == Section.HOME) && !showingOptions) render();
                 schedulePoll(15_000);
             });
         });
     }
 
+    private void queueDeviceDownload(DownloadRecord record, JSONObject jobResponse, String token) throws Exception {
+        JSONArray files = jobResponse.optJSONArray("files");
+        if (files == null || files.length() != 1) {
+            throw new IOException("This result needs multiple parts. Choose a lower quality and try again.");
+        }
+        JSONObject file = files.optJSONObject(0);
+        if (file == null) throw new IOException("The service did not return a downloadable file.");
+        String relativeUrl = file.optString("download_url", "");
+        if (relativeUrl.isEmpty()) throw new IOException("The service did not return a file address.");
+        String filename = safeDeviceFilename(file.optString("name", "media"));
+        String mimeType = file.optString("mime_type", "application/octet-stream");
+        DownloadManager manager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+        if (manager == null) throw new IOException("Android download service is unavailable.");
+
+        File externalDownloads = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        if (externalDownloads == null) throw new IOException("Device storage is unavailable.");
+        File downloadDirectory = new File(externalDownloads, "K2AppLite");
+        if (!downloadDirectory.exists() && !downloadDirectory.mkdirs()) {
+            throw new IOException("Could not prepare device storage for this download.");
+        }
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(api.fileUrl(relativeUrl)));
+        request.addRequestHeader("Authorization", "Bearer " + token);
+        request.setTitle(filename);
+        request.setDescription("Saving to your device");
+        request.setMimeType(mimeType);
+        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        request.setAllowedOverMetered(!preferences.getBoolean(WIFI_ONLY_KEY, true));
+        request.setAllowedOverRoaming(false);
+        request.setDestinationInExternalFilesDir(
+                getApplicationContext(), Environment.DIRECTORY_DOWNLOADS, "K2AppLite/" + filename);
+
+        record.remoteFileUrl = relativeUrl;
+        record.fileName = filename;
+        record.mimeType = mimeType;
+        record.totalBytes = Math.max(0L, file.optLong("size_bytes", 0L));
+        record.downloadId = manager.enqueue(request);
+        record.status = "saving";
+        record.statusText = "Saving to device";
+        record.progress = 70;
+        record.deviceProgress = 0;
+        record.downloadedBytes = 0L;
+    }
+
+    private void updateDeviceDownload(DownloadRecord record) {
+        if (record.downloadId <= 0) {
+            record.status = "failed";
+            record.statusText = "The device download could not be resumed. Analyze the link again.";
+            record.progress = 0;
+            return;
+        }
+        DownloadManager manager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+        if (manager == null) {
+            record.status = "failed";
+            record.statusText = "Android download service is unavailable.";
+            record.progress = 0;
+            return;
+        }
+        Cursor cursor = null;
+        try {
+            cursor = manager.query(new DownloadManager.Query().setFilterById(record.downloadId));
+            if (cursor == null || !cursor.moveToFirst()) {
+                record.status = "failed";
+                record.statusText = "The device download is no longer available. Analyze the link again.";
+                record.progress = 0;
+                return;
+            }
+            int state = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+            record.downloadedBytes = Math.max(0L, cursor.getLong(
+                    cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)));
+            record.totalBytes = Math.max(0L, cursor.getLong(
+                    cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)));
+            if (record.totalBytes > 0L) {
+                record.deviceProgress = (int) Math.max(0L, Math.min(100L,
+                        record.downloadedBytes * 100L / record.totalBytes));
+            }
+            if (state == DownloadManager.STATUS_SUCCESSFUL) {
+                Uri fileUri = manager.getUriForDownloadedFile(record.downloadId);
+                if (fileUri == null) {
+                    record.status = "failed";
+                    record.statusText = "The file saved, but Android could not open it from the library.";
+                    record.progress = 0;
+                    return;
+                }
+                record.localPath = fileUri.toString();
+                record.status = "done";
+                record.progress = 100;
+                record.deviceProgress = 100;
+                record.statusText = "Saved on device";
+            } else if (state == DownloadManager.STATUS_FAILED) {
+                int reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON));
+                record.status = "failed";
+                record.progress = 0;
+                record.statusText = reason == DownloadManager.ERROR_INSUFFICIENT_SPACE
+                        ? "Not enough device storage. Free space and analyze the link again."
+                        : "Could not save the file on this device. Check your connection and try again.";
+            } else {
+                record.status = "saving";
+                record.progress = 70 + record.deviceProgress * 30 / 100;
+                record.statusText = state == DownloadManager.STATUS_PAUSED
+                        ? "Waiting for a network connection"
+                        : "Saving to device · " + record.deviceProgress + "%";
+            }
+        } catch (Exception failure) {
+            record.status = "failed";
+            record.statusText = "Could not check the device download. Analyze the link again.";
+            record.progress = 0;
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+    }
+
+    private String safeDeviceFilename(String value) {
+        String filename = value == null ? "" : value.replaceAll("[^A-Za-z0-9_.-]", "_");
+        if (filename.isEmpty() || ".".equals(filename) || "..".equals(filename)) filename = "media";
+        if (filename.length() > 140) filename = filename.substring(0, 140);
+        return filename;
+    }
+
+    private void openLocalFile(DownloadRecord record) {
+        if (record == null || TextUtils.isEmpty(record.localPath)) {
+            showToast("This file is not available in the device library.");
+            return;
+        }
+        try {
+            Uri uri = Uri.parse(record.localPath);
+            Intent open = new Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, TextUtils.isEmpty(record.mimeType) ? "application/octet-stream" : record.mimeType)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(open, "Open with"));
+        } catch (Exception failure) {
+            showToast("No compatible app could open this file. It remains saved on this phone.");
+        }
+    }
+
     private void clearFinished() {
         int before = jobs.size();
-        jobs.removeIf(DownloadRecord::isCompleted);
+        jobs.removeIf(DownloadRecord::isTerminal);
         saveJobs();
         render();
-        showToast(before == jobs.size() ? "No finished jobs to clear." : "Finished jobs removed from this device.");
+        showToast(before == jobs.size() ? "No finished jobs to clear." : "Finished history removed. Saved files remain on this phone.");
     }
 
     private void confirmDisconnect() {
         new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Disconnect this device?")
-                .setMessage("This removes the saved pairing token from this phone. It does not delete Telegram files or server history.")
+                .setTitle("Reset this device session?")
+                .setMessage("This ends the anonymous session and removes its server-side jobs and files. Files already saved on this phone remain. The session cannot be recovered.")
                 .setNegativeButton("Cancel", null)
-                .setPositiveButton("Disconnect", (dialog, which) -> {
-                    tokenStore.clear();
-                    pairingMessage = "Device disconnected.";
+                .setPositiveButton("Reset session", (dialog, which) -> {
+                    sessionStatus = "Resetting...";
+                    sessionMessage = "";
                     render();
+                    io.execute(() -> {
+                        try {
+                            String oldToken = tokenStore.read();
+                            if (!TextUtils.isEmpty(oldToken)) {
+                                try {
+                                    api.revokeSession(oldToken);
+                                } catch (LiteApi.ApiException expired) {
+                                    if (expired.statusCode != 401) throw expired;
+                                }
+                            }
+                            DownloadManager manager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+                            for (DownloadRecord record : jobs) {
+                                if (!record.isCompleted()) {
+                                    if (record.downloadId > 0 && manager != null) manager.remove(record.downloadId);
+                                    record.status = "failed";
+                                    record.statusText = "Session reset. Analyze the link again to restart.";
+                                    record.progress = 0;
+                                }
+                            }
+                            tokenStore.clear();
+                            createDeviceSession();
+                            saveJobs();
+                            runOnUiThread(() -> {
+                                sessionStatus = "Active on this phone";
+                                sessionMessage = "";
+                                render();
+                                showToast("Device session reset. Saved files remain on this phone.");
+                            });
+                        } catch (Exception failure) {
+                            runOnUiThread(() -> {
+                                sessionStatus = tokenStore.read() == null ? "Unavailable" : "Active on this phone";
+                                sessionMessage = "Could not reset the server session: " + safeMessage(failure);
+                                render();
+                            });
+                        }
+                    });
                 }).show();
     }
 
@@ -961,14 +1189,6 @@ public final class MainActivity extends AppCompatActivity {
         if (urlInput != null && value != null) {
             urlInput.setText(value.toString().trim());
             urlInput.setSelection(urlInput.length());
-        }
-    }
-
-    private void openTelegram() {
-        try {
-            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(botUrl)));
-        } catch (Exception failure) {
-            showToast("Could not open Telegram.");
         }
     }
 
@@ -1093,15 +1313,21 @@ public final class MainActivity extends AppCompatActivity {
         return height > 0 ? height + "p video" : "Best available video";
     }
 
+    private String formatBytes(long bytes) {
+        if (bytes <= 0L) return "Estimate unavailable";
+        if (bytes < 1_048_576L) return String.format(Locale.ROOT, "%.0f KB", bytes / 1024.0);
+        return String.format(Locale.ROOT, "%.1f MB", bytes / 1_048_576.0);
+    }
+
     private String friendlyStatus(DownloadRecord record) {
-        if (record.isCompleted()) return "Ready in Telegram";
+        if (record.isCompleted()) return "Saved on device";
         String status = record.status == null ? "" : record.status.toLowerCase(Locale.ROOT);
-        if ("queued".equals(status)) return "Waiting in queue";
-        if ("downloading".equals(status)) return "Downloading · " + record.progress + "%";
-        if ("preparing".equals(status)) return "Preparing media";
-        if ("uploading".equals(status)) return "Sending to Telegram";
-        if ("failed".equals(status)) return "Transfer failed";
-        return "Processing";
+        if ("queued".equals(status)) return "Queued on server";
+        if ("downloading".equals(status)) return "Downloading on server · " + record.progress + "%";
+        if ("preparing".equals(status)) return "Preparing on server";
+        if ("saving".equals(status)) return "Saving to device · " + record.deviceProgress + "%";
+        if ("failed".equals(status)) return "Download failed";
+        return "Processing on server";
     }
 
     private String safeMessage(Exception failure) {

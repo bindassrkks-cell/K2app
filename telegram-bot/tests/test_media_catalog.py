@@ -25,12 +25,14 @@ class MediaCatalogTests(unittest.TestCase):
         self.assertEqual([choice["height"] for choice in videos], [1080, 720, 480])
         self.assertEqual(videos[0]["format_selector"], "v1080+a256")
         self.assertTrue(all(choice["label"].startswith("MP4") for choice in videos))
+        self.assertGreater(videos[0]["estimated_size_bytes"], 0)
 
     def test_audio_choices_expose_bounded_mp3_bitrates(self):
         choices = build_choices(self.info)
         audio = [choice for choice in choices if choice["kind"] == "audio"]
         self.assertEqual([choice["audio_quality"] for choice in audio], [320, 192, 128])
         self.assertTrue(all(choice["format_selector"] == "a256" for choice in audio))
+        self.assertGreater(audio[0]["estimated_size_bytes"], 0)
 
     def test_thumbnail_is_included_only_for_https_url(self):
         self.assertIn("thumbnail", [choice["kind"] for choice in build_choices(self.info)])
