@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_home_title">Download anything</string>
+    <string name="ui_home_subtitle">Paste a media link to begin.</string>
+    <string name="ui_search_or_paste_url">Search or paste URL</string>
+    <string name="ui_paste_link">Paste link</string>
+    <string name="ui_ready_when_you_are">Ready when you are</string>
+    <string name="ui_home_empty_message">Search by title or paste a video/audio link.</string>
+    <string name="ui_search_a_title">Search a title</string>
+    <string name="ui_home_loading">Finding media…</string>
+    <string name="ui_recent">Recent</string>
+    <string name="ui_all">All</string>
+    <string name="ui_completed">Completed</string>
+    <string name="ui_more_subtitle">Tools and preferences</string>
+    <string name="ui_settings_personalize">Personalize K2App</string>
+    <string name="ui_tools_header">Tools</string>
+    <string name="ui_developer_tools">Developer tools</string>
+    <string name="ui_telegram_not_connected">Not connected</string>
+    <string name="ui_telegram_connect">Connect bot</string>
+    <string name="ui_telegram_receive_summary">Receive media links from your configured chat</string>
+</resources>

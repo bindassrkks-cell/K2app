@@ -3,8 +3,5 @@
     <item name="settingsFragment" type="id" />
     <item name="downloadsFragment" type="id" />
     <item name="pill_downloads" type="id" />
-    <item name="pill_quran" type="id" />
-    <item name="pill_history" type="id" />
     <item name="pill_input_url" type="id" />
-    <item name="quran_app" type="id" />
 </resources>
