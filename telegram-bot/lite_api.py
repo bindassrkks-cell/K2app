@@ -31,6 +31,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from bot import (
     Config,
     DownloadTimeoutError,
+    MediaResolutionError,
     MediaTooLargeError,
     _download_with_deadline,
     _public_dns_only,
@@ -637,7 +638,10 @@ async def _run_lite_job(
         store.set_job_status(job_id, user_id, "failed", 0, "The server timed out. Try again or choose a lower quality.")
         shutil.rmtree(job_dir, ignore_errors=True)
     except MediaTooLargeError:
-        store.set_job_status(job_id, user_id, "failed", 0, "This media exceeds the server download limit.")
+        store.set_job_status(job_id, user_id, "failed", 0, "This result is too large for the Lite server. Choose a lower quality.")
+        shutil.rmtree(job_dir, ignore_errors=True)
+    except MediaResolutionError as error:
+        store.set_job_status(job_id, user_id, "failed", 0, str(error))
         shutil.rmtree(job_dir, ignore_errors=True)
     except LiteResultTooLargeError:
         store.set_job_status(job_id, user_id, "failed", 0, "This result is too large for the Lite server. Choose a lower quality.")
@@ -732,6 +736,8 @@ async def create_lite_job(request: Request):
             media = await _resolve_media_with_deadline(url)
         except TimeoutError:
             raise HTTPException(status_code=504, detail="Media lookup timed out") from None
+        except MediaResolutionError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from None
         except Exception:
             raise HTTPException(status_code=422, detail="This URL could not be inspected") from None
         if not isinstance(media, dict) or not media.get("choices"):

@@ -10,6 +10,56 @@ from urllib.parse import urlsplit
 FORMAT_ID = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
 QUALITY_LEVELS = (1080, 720, 480, 360)
 AUDIO_QUALITIES = (320, 192, 128)
+MEDIA_ERROR_MESSAGES = {
+    "unsupported": "No downloadable video or audio formats were found for this link.",
+    "access": "This video requires login or permission that Lite does not have.",
+    "protected": "This source uses protected media that Lite cannot download.",
+    "region": "This source is unavailable from the server's region.",
+    "blocked": "The source blocked or rate-limited the server. Try again later.",
+    "timeout": "The source took too long to respond. Try again.",
+    "extractor": "The server video extractor is not configured correctly. Please try later.",
+    "temporary": "This link could not be inspected. It may be unsupported or temporarily unavailable.",
+}
+
+
+class MediaResolutionError(RuntimeError):
+    def __init__(self, code: str):
+        self.code = code if code in MEDIA_ERROR_MESSAGES else "temporary"
+        super().__init__(MEDIA_ERROR_MESSAGES[self.code])
+
+
+def classify_extraction_error(error: BaseException) -> str:
+    if isinstance(error, MediaResolutionError):
+        return error.code
+    if isinstance(error, TimeoutError):
+        return "timeout"
+    if isinstance(error, (ImportError, ModuleNotFoundError)):
+        return "extractor"
+    text = str(error).lower()
+    if any(term in text for term in ("drm", "widevine", "fairplay", "playready", "protected stream")):
+        return "protected"
+    if any(term in text for term in ("geo-restricted", "not available in your country", "unavailable in your region")):
+        return "region"
+    if any(term in text for term in (
+        "login required", "log in", "sign in", "authentication required", "private video",
+        "members-only", "subscriber-only", "age-restricted", "not authorized",
+    )):
+        return "access"
+    if any(term in text for term in (
+        "unsupported url", "no downloadable", "no suitable formats", "no formats found",
+        "requested format is not available",
+    )):
+        return "unsupported"
+    if any(term in text for term in (
+        "captcha", "bot detection", "ip blocked", "rate limit", "too many requests",
+        "http error 403", "http error 429", "forbidden",
+    )):
+        return "blocked"
+    if any(term in text for term in ("timed out", "timeout", "temporary failure", "connection reset")):
+        return "timeout"
+    if "yt-dlp is not installed" in text or "ffmpeg not found" in text:
+        return "extractor"
+    return "temporary"
 
 
 def _safe_thumbnail(value: Any) -> bool:
@@ -88,7 +138,11 @@ def build_choices(info: dict[str, Any]) -> list[dict[str, Any]]:
     formats = [fmt for fmt in info.get("formats", []) if isinstance(fmt, dict)]
     video_formats = [
         f for f in formats
-        if _has_video(f) and isinstance(f.get("height"), (int, float)) and _format_id(f)
+        if _has_video(f) and _format_id(f)
+    ]
+    height_formats = [
+        f for f in video_formats
+        if isinstance(f.get("height"), (int, float)) and not isinstance(f.get("height"), bool)
     ]
     audio_formats = [
         f for f in formats
@@ -107,7 +161,7 @@ def build_choices(info: dict[str, Any]) -> list[dict[str, Any]]:
     seen_heights: set[int] = set()
     duration = _number(info, "duration")
     for target in QUALITY_LEVELS:
-        candidates = [f for f in video_formats if 0 < int(f["height"]) <= target]
+        candidates = [f for f in height_formats if 0 < int(f["height"]) <= target]
         if not candidates:
             continue
         candidates.sort(
@@ -199,11 +253,10 @@ def summarize_info(info: dict[str, Any]) -> dict[str, Any]:
 
 def resolve_media(url: str) -> dict[str, Any]:
     """Resolve a public URL without downloading media and return only bounded UI fields."""
-    from yt_dlp import YoutubeDL
     from bot import _public_dns_only, is_safe_http_url
 
     if not is_safe_http_url(url):
-        raise ValueError("Only public http(s) media URLs are supported")
+        raise MediaResolutionError("unsupported")
     options = {
         "quiet": True,
         "no_warnings": True,
@@ -213,12 +266,19 @@ def resolve_media(url: str) -> dict[str, Any]:
         "retries": 1,
         "extract_flat": False,
     }
-    with YoutubeDL(options) as downloader:
-        with _public_dns_only():
-            info = downloader.extract_info(url, download=False)
-    if not isinstance(info, dict):
-        raise ValueError("No media information was returned")
-    result = summarize_info(info)
-    if not result["choices"]:
-        raise ValueError("No downloadable video or audio formats were found")
-    return result
+    try:
+        from yt_dlp import YoutubeDL
+
+        with YoutubeDL(options) as downloader:
+            with _public_dns_only():
+                info = downloader.extract_info(url, download=False)
+        if not isinstance(info, dict):
+            raise MediaResolutionError("unsupported")
+        result = summarize_info(info)
+        if not result["choices"]:
+            raise MediaResolutionError("unsupported")
+        return result
+    except MediaResolutionError:
+        raise
+    except Exception as error:
+        raise MediaResolutionError(classify_extraction_error(error)) from None

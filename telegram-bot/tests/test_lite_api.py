@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 import lite_api
 import web
+from media_catalog import MediaResolutionError
 
 TOKEN = "12345:" + "A" * 30
 OWNER = "8640134736"
@@ -165,6 +166,46 @@ class LiteApiTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 400)
         resolver.assert_not_awaited()
+
+    def test_analysis_returns_safe_category_for_access_restricted_media(self):
+        token = self.new_session()
+
+        async def fail_lookup(_url):
+            raise MediaResolutionError("access")
+
+        with patch.object(lite_api, "_resolve_media_with_deadline", fail_lookup):
+            response = self.client.post(
+                "/api/v1/jobs",
+                json={"url": "https://example.com/video?token=private"},
+                headers=self.auth(token),
+            )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"], "This video requires login or permission that Lite does not have.")
+        self.assertNotIn("private", response.text)
+        self.assertNotIn("example.com", response.text)
+
+    def test_download_failure_status_uses_safe_category_message(self):
+        token = self.new_session()
+        created = self.create_job(token)
+        self.assertEqual(created.status_code, 202, created.text)
+        job_id = created.json()["job_id"]
+
+        async def fail_download(*_args, **_kwargs):
+            raise MediaResolutionError("blocked")
+
+        with patch.object(lite_api, "_download_with_deadline", fail_download):
+            chosen = self.client.post(
+                f"/api/v1/jobs/{job_id}/choose",
+                json={"choice_index": 0},
+                headers=self.auth(token),
+            )
+            self.assertEqual(chosen.status_code, 202, chosen.text)
+            status = self.client.get(f"/api/v1/jobs/{job_id}", headers=self.auth(token))
+
+        self.assertEqual(status.status_code, 200, status.text)
+        self.assertEqual(status.json()["status"], "failed")
+        self.assertEqual(status.json()["status_text"], "The source blocked or rate-limited the server. Try again later.")
 
     def test_download_is_saved_on_server_and_only_its_device_can_fetch_it(self):
         token_a = self.new_session()

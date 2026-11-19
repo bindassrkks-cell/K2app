@@ -23,6 +23,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import httpx
+from media_catalog import MediaResolutionError, classify_extraction_error
 
 LOGGER = logging.getLogger("k2app.telegram_bot")
 URL_PATTERN = re.compile(r"https?://[^\s<>\[\]]+", re.IGNORECASE)
@@ -601,7 +602,7 @@ def _download_media(
         message = str(error).lower()
         if "max-filesize" in message or "larger than max" in message:
             raise MediaTooLargeError(0, max_bytes) from None
-        raise RuntimeError("yt-dlp could not download this URL") from None
+        raise MediaResolutionError(classify_extraction_error(error)) from None
 
     size = media_path.stat().st_size
     if size > max_bytes:
@@ -625,6 +626,8 @@ def _download_process_entry(
         send_conn.send(("ok", str(path), title))
     except MediaTooLargeError as error:
         send_conn.send(("too_large", error.size_bytes, error.limit_bytes))
+    except MediaResolutionError as error:
+        send_conn.send(("media_error", error.code))
     except BaseException as error:
         send_conn.send(("error", type(error).__name__))
     finally:
@@ -695,6 +698,8 @@ async def _download_with_deadline(
             return Path(result[1]), result[2]
         if result[0] == "too_large":
             raise MediaTooLargeError(result[1], result[2])
+        if result[0] == "media_error":
+            raise MediaResolutionError(result[1])
         raise RuntimeError("Media download failed")
     except asyncio.CancelledError:
         if process.is_alive():
@@ -713,7 +718,7 @@ def _resolve_process_entry(send_conn, url: str) -> None:
         from media_catalog import resolve_media
         send_conn.send(("ok", resolve_media(url)))
     except BaseException as error:
-        send_conn.send(("error", type(error).__name__))
+        send_conn.send(("media_error", classify_extraction_error(error)))
     finally:
         send_conn.close()
 
@@ -743,8 +748,12 @@ async def _resolve_media_with_deadline(url: str, timeout_seconds: int = 90) -> d
             else:
                 break
         process.join()
-        if result is None or result[0] != "ok":
-            raise RuntimeError("Media metadata lookup failed")
+        if result is None:
+            raise MediaResolutionError("temporary")
+        if result[0] == "media_error":
+            raise MediaResolutionError(result[1])
+        if result[0] != "ok":
+            raise MediaResolutionError("temporary")
         return result[1]
     except asyncio.CancelledError:
         if process.is_alive():

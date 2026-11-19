@@ -1,6 +1,16 @@
+import sys
+import types
 import unittest
+from contextlib import nullcontext
+from unittest.mock import patch
 
-from media_catalog import build_choices, summarize_info
+from media_catalog import (
+    MediaResolutionError,
+    build_choices,
+    classify_extraction_error,
+    resolve_media,
+    summarize_info,
+)
 
 
 class MediaCatalogTests(unittest.TestCase):
@@ -63,6 +73,73 @@ class MediaCatalogTests(unittest.TestCase):
         }
         choices = build_choices(malformed)
         self.assertFalse(any(choice.get("format_selector", "").startswith("x+system") for choice in choices))
+
+    def test_video_without_height_metadata_gets_best_available_fallback(self):
+        info = {
+            "formats": [
+                {"format_id": "generic-video", "vcodec": "h264", "acodec": "aac", "ext": "mp4", "tbr": 1200}
+            ]
+        }
+        videos = [choice for choice in build_choices(info) if choice["kind"] == "video"]
+        self.assertEqual(len(videos), 1)
+        self.assertEqual(videos[0]["label"], "MP4 · Best available")
+        self.assertIsNone(videos[0]["height"])
+        self.assertEqual(videos[0]["format_selector"], "generic-video")
+
+    def test_unknown_public_url_uses_default_ytdlp_extractors_and_safe_formats(self):
+        captured = {}
+        url = "https://media.example/watch?id=clip-1&share=token"
+
+        class FakeYoutubeDL:
+            def __init__(self, options):
+                captured["options"] = options
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return None
+
+            def extract_info(self, value, download=False):
+                captured["url"] = value
+                captured["download"] = download
+                return {
+                    "title": "Generic video",
+                    "extractor_key": "Generic",
+                    "formats": [
+                        {"format_id": "http-360p", "height": 360, "vcodec": "h264", "acodec": "aac", "ext": "mp4"}
+                    ],
+                }
+
+        fake_module = types.ModuleType("yt_dlp")
+        fake_module.YoutubeDL = FakeYoutubeDL
+        with patch.dict(sys.modules, {"yt_dlp": fake_module}), \
+                patch("bot.is_safe_http_url", return_value=True), \
+                patch("bot._public_dns_only", return_value=nullcontext()):
+            result = resolve_media(url)
+
+        self.assertEqual(captured["url"], url)
+        self.assertFalse(captured["download"])
+        self.assertTrue(captured["options"]["noplaylist"])
+        self.assertFalse(captured["options"]["extract_flat"])
+        self.assertNotIn("extractor_ies", captured["options"])
+        self.assertNotIn("allowed_extractors", captured["options"])
+        self.assertEqual(result["extractor"], "Generic")
+        self.assertTrue(result["choices"])
+
+    def test_extractor_failures_get_safe_non_url_bearing_messages(self):
+        cases = [
+            ("login required for this video", "access"),
+            ("This video is geo-restricted", "region"),
+            ("HTTP Error 429: Too Many Requests", "blocked"),
+            ("Unsupported URL: https://example.com/private?token=secret", "unsupported"),
+        ]
+        for detail, expected_code in cases:
+            with self.subTest(detail=detail):
+                error = MediaResolutionError(classify_extraction_error(RuntimeError(detail)))
+                self.assertEqual(error.code, expected_code)
+                self.assertNotIn("example.com", str(error))
+                self.assertNotIn("secret", str(error))
 
 
 if __name__ == "__main__":

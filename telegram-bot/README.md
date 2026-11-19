@@ -49,6 +49,8 @@ Poll `GET /api/v1/jobs/<job_id>` with the same Bearer token. States include `cho
 
 Lite sessions can analyze up to five links per hour. Session issuance is capped globally at 100 new sessions per hour across all devices. Lite source and result data are capped at 300 MB, server-side jobs/files expire after six hours, and the media worker processes one job at a time. The API accepts only public HTTP(S) media URLs, bounds request bodies, blocks private/reserved DNS destinations and returns only allowlisted media metadata and format fields. Render Free storage is ephemeral, so a restart can invalidate sessions and jobs; the app can create a new anonymous session, but old server jobs cannot be recovered.
 
+Lite uses yt-dlp's built-in extractor registry and generic HTTP/web-page fallback without a site allowlist. The server dependency is `yt-dlp[default]>=2026.10.26,<2027`; its `default` extra includes `yt-dlp-ejs`, and the Docker image supplies Deno and FFmpeg for JavaScript-assisted extraction and stream merging. Browser-impersonation transport is not enabled because its native network path cannot be covered by the public-DNS guard; sites that require it may fail. This broadens coverage but is not universal: site changes, missing/removed/private media, login or regional restrictions, anti-bot/rate limits, DRM and expiring links can still prevent extraction. Lite does not use account cookies or bypass source protections. Common failures return safe explanations rather than raw extractor output.
+
 ## Webhook deployment
 
 Configure these host environment variables/secrets:
