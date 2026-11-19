@@ -6,6 +6,7 @@ results to Telegram and keeps Lite session/job state in its own SQLite database.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 import hashlib
 import json
 import logging
@@ -29,7 +30,6 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 
 from bot import (
-    Config,
     DownloadTimeoutError,
     MediaResolutionError,
     MediaTooLargeError,
@@ -59,6 +59,13 @@ ALLOWED_MIME_EXTENSIONS = {
     "image/webp": ".webp",
     "image/gif": ".gif",
 }
+
+
+@dataclass(frozen=True)
+class LiteApiConfig:
+    """Runtime settings needed by Lite downloads, independent of Telegram config."""
+
+    max_download_bytes: int = MAX_RESULT_BYTES
 
 
 def _release_job_reservation(app, job_id: str) -> None:
@@ -538,7 +545,7 @@ async def _run_lite_job(
     app = request.app
     store: LiteApiStore = app.state.lite_store
     output_dir = Path(app.state.lite_output_dir)
-    config: Config = app.state.lite_config
+    config = app.state.lite_config
     lock: asyncio.Lock = app.state.media_worker_lock
     job_dir = output_dir / job_id
     try:
