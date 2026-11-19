@@ -46,7 +46,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="Kupido2"
+        android:label="@string/app_name"
         android:localeConfig="@xml/locales_config"
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher"
@@ -600,7 +600,6 @@
                 android:resource="@xml/provider_paths" />
         </provider>
 
-        <activity android:name="com.deniscerri.ytdl.ui.quran.QuranActivity" android:exported="false" />
     </application>
 
 </manifest>

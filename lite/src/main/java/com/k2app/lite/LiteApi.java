@@ -1,0 +1,157 @@
+package com.k2app.lite;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
+final class LiteApi {
+    private static final int MAX_JSON_RESPONSE_BYTES = 1_048_576;
+    private final String baseUrl;
+
+    LiteApi(String baseUrl) {
+        String normalized = baseUrl == null ? "" : baseUrl.replaceAll("/+$", "");
+        try {
+            URL parsed = new URL(normalized);
+            if (!"https".equalsIgnoreCase(parsed.getProtocol())
+                    || parsed.getHost().isEmpty()
+                    || parsed.getUserInfo() != null
+                    || parsed.getQuery() != null
+                    || parsed.getRef() != null) {
+                throw new IllegalArgumentException("K2App Lite requires a fixed HTTPS API origin.");
+            }
+        } catch (MalformedURLException failure) {
+            throw new IllegalArgumentException("K2App Lite API address is invalid.", failure);
+        }
+        this.baseUrl = normalized;
+    }
+
+    JSONObject serviceStatus() throws IOException, JSONException {
+        return request("GET", "/health", null, null);
+    }
+
+    JSONObject createSession() throws IOException, JSONException {
+        return request("POST", "/api/v1/auth/session", new JSONObject(), null);
+    }
+
+    JSONObject inspectSession(String token) throws IOException, JSONException {
+        return request("GET", "/api/v1/auth/session", null, token);
+    }
+
+    JSONObject revokeSession(String token) throws IOException, JSONException {
+        return request("POST", "/api/v1/auth/revoke", new JSONObject(), token);
+    }
+
+    JSONObject analyze(String mediaUrl, String token) throws IOException, JSONException {
+        JSONObject body = new JSONObject().put("url", mediaUrl);
+        return request("POST", "/api/v1/jobs", body, token);
+    }
+
+    JSONObject choose(String jobId, int choiceIndex, String token) throws IOException, JSONException {
+        JSONObject body = new JSONObject().put("choice_index", choiceIndex);
+        return request("POST", "/api/v1/jobs/" + pathPart(jobId) + "/choose", body, token);
+    }
+
+    JSONObject job(String jobId, String token) throws IOException, JSONException {
+        return request("GET", "/api/v1/jobs/" + pathPart(jobId), null, token);
+    }
+
+    String fileUrl(String relativePath) throws IOException {
+        if (relativePath == null
+                || !relativePath.startsWith("/api/v1/jobs/")
+                || relativePath.contains("..")
+                || relativePath.contains("\\")
+                || relativePath.contains("?")
+                || relativePath.contains("#")) {
+            throw new IOException("The service returned an invalid file address.");
+        }
+        return baseUrl + relativePath;
+    }
+
+    private String pathPart(String value) throws IOException {
+        if (value == null || value.isEmpty() || value.contains("..") || value.contains("/")) {
+            throw new IOException("The service returned an invalid job ID.");
+        }
+        return URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20");
+    }
+
+    private JSONObject request(String method, String path, JSONObject body, String bearer)
+            throws IOException, JSONException {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(baseUrl + path).openConnection();
+            connection.setRequestMethod(method);
+            connection.setConnectTimeout(20_000);
+            connection.setReadTimeout(120_000);
+            connection.setInstanceFollowRedirects(false);
+            connection.setUseCaches(false);
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("Cache-Control", "no-store");
+            connection.setRequestProperty("User-Agent", "K2App-Lite/1.0");
+            if (bearer != null && !bearer.isEmpty()) {
+                connection.setRequestProperty("Authorization", "Bearer " + bearer);
+            }
+            if (body != null) {
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                byte[] payload = body.toString().getBytes(StandardCharsets.UTF_8);
+                connection.setFixedLengthStreamingMode(payload.length);
+                try (OutputStream output = connection.getOutputStream()) {
+                    output.write(payload);
+                }
+            }
+            int status = connection.getResponseCode();
+            InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
+            String responseText = stream == null ? "{}" : readFully(stream);
+            JSONObject response;
+            try {
+                response = new JSONObject(responseText);
+            } catch (JSONException malformed) {
+                if (status >= 400) {
+                    throw new ApiException(status, "The K2App service returned HTTP " + status + ".");
+                }
+                throw malformed;
+            }
+            if (status >= 400) {
+                String detail = response.optString("detail", "Request failed (HTTP " + status + ")");
+                throw new ApiException(status, detail);
+            }
+            return response;
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+    }
+
+    private String readFully(InputStream stream) throws IOException {
+        try (InputStream input = stream; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int count;
+            int total = 0;
+            while ((count = input.read(buffer)) != -1) {
+                total += count;
+                if (total > MAX_JSON_RESPONSE_BYTES) {
+                    throw new IOException("The K2App service response was too large.");
+                }
+                output.write(buffer, 0, count);
+            }
+            return output.toString(StandardCharsets.UTF_8.name());
+        }
+    }
+
+    static final class ApiException extends IOException {
+        final int statusCode;
+
+        ApiException(int statusCode, String message) {
+            super(message);
+            this.statusCode = statusCode;
+        }
+    }
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="k2_ui_background">#0B0E10</color>
+    <color name="k2_ui_surface">#151A18</color>
+    <color name="k2_ui_surface_high">#1D2520</color>
+    <color name="k2_ui_accent">#A5EF70</color>
+    <color name="k2_ui_accent_container">#25391F</color>
+    <color name="k2_ui_on_accent">#14210D</color>
+    <color name="k2_ui_text_primary">#F3F5F2</color>
+    <color name="k2_ui_text_secondary">#A8B1AA</color>
+    <color name="k2_ui_outline">#313A34</color>
+    <color name="k2_ui_shimmer_base">#252C28</color>
+    <color name="k2_ui_shimmer_highlight">#3B443E</color>
+    <color name="k2_ui_nav_unselected">#AAB2AD</color>
+</resources>

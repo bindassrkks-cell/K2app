@@ -1,0 +1,10 @@
+<resources>
+    <color name="k2_background">#101411</color>
+    <color name="k2_surface">#1B211E</color>
+    <color name="k2_surface_variant">#242B27</color>
+    <color name="k2_lime">#B8F35A</color>
+    <color name="k2_on_lime">#11170D</color>
+    <color name="k2_text">#F3F5F2</color>
+    <color name="k2_muted">#A1AAA3</color>
+    <color name="k2_outline">#39433D</color>
+</resources>

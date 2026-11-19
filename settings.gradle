@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 rootProject.name = "YTDLnis"
 
 include ':app'
+include ':lite'

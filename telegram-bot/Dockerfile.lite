@@ -1,0 +1,24 @@
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DENO_NO_UPDATE_CHECK=1 \
+    LITE_API_DB_FILE=/data/k2app-lite-api.sqlite3 \
+    LITE_DOWNLOAD_DIR=/data/lite-downloads
+
+COPY --from=denoland/deno:bin-2.9.8 /deno /usr/local/bin/deno
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates ffmpeg \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 10001 k2lite \
+    && mkdir -p /app /data \
+    && chown -R k2lite:k2lite /app /data
+
+WORKDIR /app
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+COPY --chown=k2lite:k2lite . .
+
+USER k2lite
+CMD ["sh", "-c", "uvicorn lite_web:app --host 0.0.0.0 --port ${PORT:-10000}"]

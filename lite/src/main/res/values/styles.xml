@@ -1,0 +1,20 @@
+<resources>
+    <style name="Theme.K2Lite" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/k2_lime</item>
+        <item name="colorOnPrimary">@color/k2_on_lime</item>
+        <item name="colorSecondary">@color/k2_lime</item>
+        <item name="colorOnSecondary">@color/k2_on_lime</item>
+        <item name="colorSurface">@color/k2_surface</item>
+        <item name="colorOnSurface">@color/k2_text</item>
+        <item name="colorSurfaceVariant">@color/k2_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/k2_muted</item>
+        <item name="colorOutline">@color/k2_outline</item>
+        <item name="android:colorAccent">@color/k2_lime</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:statusBarColor">@color/k2_background</item>
+        <item name="android:navigationBarColor">@color/k2_background</item>
+        <item name="android:windowBackground">@color/k2_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>
